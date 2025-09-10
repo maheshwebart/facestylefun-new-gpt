@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>facestyle.fun</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        background-color: #000000;
+        font-family: 'Poppins', sans-serif;
+      }
+      .glow-border {
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.5), 0 0 5px rgba(0, 255, 255, 0.7);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
+  }
+}
+</script>
+    <!-- 
+      - TODO: Replace 'YOUR_CLIENT_ID' with your actual PayPal Developer Client ID.
+      - This script should be configured with your own credentials from the PayPal Developer Dashboard.
+    -->
+    <script src="https://www.paypal.com/sdk/js?client-id=AT6GwV2NXHr38tEW6E7-CrFUa1ITWHlPKL8NFMP8m8o7iJpOEgiN_jZfPNm7Ja8ZLND1bnJ_9uwgk4Ne&currency=USD"></script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
