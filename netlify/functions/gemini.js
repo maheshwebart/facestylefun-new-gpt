@@ -10,18 +10,47 @@ export default async (req) => {
       return new Response("Server misconfig: GEMINI_API_KEY not set", { status: 500 });
     }
 
-    const { prompt, model = "gemini-1.5-flash", gen = {} } = await req.json();
+    const { prompt, originalImage, referenceImage } = await req.json();
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(API_KEY)}`;
-    const body = {
-      contents: [{ role: "user", parts: [{ text: String(prompt ?? "") }] }],
-      generationConfig: {
-        temperature: gen.temperature ?? 0.7,
-        topP: gen.topP ?? 0.9,
-        topK: gen.topK ?? 32,
-        maxOutputTokens: gen.maxOutputTokens ?? 512,
+    if (!originalImage?.base64 || !originalImage?.mimeType) {
+      return new Response("Missing original image", { status: 400 });
+    }
+
+    // Build parts: original image + optional reference + text prompt
+    const parts = [
+      {
+        inlineData: {
+          data: originalImage.base64,
+          mimeType: originalImage.mimeType,
+        },
       },
-      // Optional: tighten safety settings on server if you want
+    ];
+
+    if (referenceImage?.base64 && referenceImage?.mimeType) {
+      parts.push({
+        inlineData: {
+          data: referenceImage.base64,
+          mimeType: referenceImage.mimeType,
+        },
+      });
+    }
+
+    if (prompt) {
+      parts.push({ text: prompt });
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${encodeURIComponent(
+      API_KEY
+    )}`;
+
+    const body = {
+      contents: [{ parts }],
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.9,
+        topK: 32,
+        maxOutputTokens: 512,
+      },
     };
 
     const r = await fetch(url, {
@@ -32,15 +61,30 @@ export default async (req) => {
 
     if (!r.ok) {
       const t = await r.text().catch(() => "");
-      return new Response(`Gemini error ${r.status}: ${t.slice(0,400)}`, { status: 502 });
+      return new Response(`Gemini error ${r.status}: ${t.slice(0, 400)}`, { status: 502 });
     }
 
     const data = await r.json();
-    return new Response(JSON.stringify({ ok: true, data }), {
+
+    // Extract base64 image data from response
+    let imageBase64 = null;
+    const partsOut = data?.candidates?.[0]?.content?.parts ?? [];
+    for (const p of partsOut) {
+      if (p.inlineData?.data) {
+        imageBase64 = p.inlineData.data;
+        break;
+      }
+    }
+
+    if (!imageBase64) {
+      return new Response("No image returned by Gemini", { status: 500 });
+    }
+
+    return new Response(JSON.stringify({ ok: true, imageBase64 }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*", // tighten to your domain in production
+        "Access-Control-Allow-Origin": "*",
       },
     });
   } catch (e) {
