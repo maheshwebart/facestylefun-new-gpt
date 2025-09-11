@@ -15,3 +15,5 @@ export async function editImageWithGemini(
   if (!imageBase64) throw new Error("Empty response from Gemini");
   return imageBase64;
 }
+
+export async function editImageWithGemini(/* ... */): Promise<string> { /* ... */ }
