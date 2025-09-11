@@ -15,7 +15,8 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "allowJs": false,
-    "strict": true
+    "strict": true,
+    "baseUrl": "."
   },
   "include": [
     "src"

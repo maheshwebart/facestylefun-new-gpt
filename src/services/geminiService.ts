@@ -5,7 +5,6 @@ export async function editImageWithGemini(
   prompt: string,
   referenceImage: ImageData | null
 ): Promise<string> {
-  // Call via /api/* which proxies to Netlify Functions (see netlify.toml)
   const response = await fetch("/api/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -15,13 +14,8 @@ export async function editImageWithGemini(
   const contentType = response.headers.get("content-type") || "";
   const bodyText = await response.text();
 
-  if (!response.ok) {
-    // Server returned an error; surface its text
-    throw new Error(bodyText || `Gemini function failed with ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(bodyText || `Gemini function failed: ${response.status}`);
   if (!contentType.includes("application/json")) {
-    // Got HTML (likely SPA redirect) or other non-JSON
     throw new Error(`Unexpected response type: ${contentType}\n${bodyText.slice(0, 200)}`);
   }
 

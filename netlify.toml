@@ -3,13 +3,13 @@
   publish = "dist"
   functions = "netlify/functions"
 
-# ✅ Public API path that proxies to Functions
+# Public API proxy → Netlify Functions (keep BEFORE SPA rule)
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# ✅ SPA catch-all (must be last)
+# SPA catch-all LAST
 [[redirects]]
   from = "/*"
   to = "/index.html"
