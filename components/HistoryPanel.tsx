@@ -1,6 +1,6 @@
 import React from 'react';
 import Button from './Button';
-import type { HistoryItem } from '../types';
+import type { HistoryItem } from '../src/types';
 
 interface HistoryPanelProps {
   history: HistoryItem[];
@@ -21,7 +21,7 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isProUser, onLoadI
           </Button>
         )}
       </div>
-      
+
       {!isProUser && (
         <div className="text-center p-3 mb-3 bg-yellow-900/30 border border-yellow-500/30 rounded-lg">
           <p className="text-sm text-yellow-200">This is temporary session history.</p>

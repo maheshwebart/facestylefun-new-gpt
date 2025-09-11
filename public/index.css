@@ -1,3 +1,4 @@
+/* Global styles */
 :root {
     color-scheme: dark;
 }
@@ -45,20 +46,6 @@ body {
     margin-right: 12px;
     font-weight: 700;
     color: #ffd56b;
-}
-
-.buyBtn {
-    background: #0af;
-    color: #001018;
-    padding: 8px 12px;
-    border-radius: 10px;
-    font-weight: 700;
-    border: none;
-    cursor: pointer;
-}
-
-.buyBtn:hover {
-    filter: brightness(1.08);
 }
 
 .container {
@@ -144,6 +131,12 @@ h3 {
     transform: translateY(-1px);
 }
 
+.tile.active {
+    outline: 2px solid #37d0ff;
+    border-color: #37d0ff;
+    background: #14283c;
+}
+
 .tile:disabled {
     opacity: .6;
     cursor: not-allowed;
@@ -200,4 +193,88 @@ h3 {
     opacity: .8;
     font-size: 12px;
     margin-top: 6px;
+}
+
+/* Prompt bar */
+.promptBar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #0f1620;
+    border: 1px solid #1a2d42;
+    border-radius: 12px;
+    padding: 8px;
+}
+
+.promptBar.isDisabled {
+    opacity: .7;
+}
+
+.iconBtn,
+.sendBtn {
+    background: #111a26;
+    border: 1px solid #1a2d42;
+    color: #dff7ff;
+    border-radius: 10px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+.iconBtn:hover,
+.sendBtn:hover {
+    filter: brightness(1.08);
+}
+
+.iconBtn[disabled],
+.sendBtn[disabled] {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.promptInput {
+    flex: 1;
+    min-height: 42px;
+    border: 1px solid #1a2d42;
+    background: #0b1320;
+    color: #dff7ff;
+    border-radius: 10px;
+    padding: 10px 12px;
+    outline: none;
+}
+
+.attachChip {
+    position: absolute;
+    left: 42px;
+    bottom: 100%;
+    transform: translateY(-8px);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #0f1620;
+    border: 1px solid #1a2d42;
+    border-radius: 12px;
+    padding: 6px;
+}
+
+.attachChip img {
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #1a2d42;
+}
+
+.chipX {
+    background: #182232;
+    color: #cfefff;
+    border: 1px solid #2a3e55;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+.chipX:hover {
+    filter: brightness(1.1);
 }
