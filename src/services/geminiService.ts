@@ -5,7 +5,7 @@ export async function editImageWithGemini(
   prompt: string,
   referenceImage: ImageData | null
 ): Promise<string> {
-  const response = await fetch("/api/gemini", {
+  const response = await fetch("/.netlify/functions/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ originalImage, prompt, referenceImage }),
