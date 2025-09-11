@@ -2,18 +2,14 @@
   command = "npm run build"
   publish = "dist"
   functions = "netlify/functions"
-# Make sure functions are not handled by SPA redirect
+
+# ✅ Public API path that proxies to Functions
 [[redirects]]
-  from = "/.netlify/functions/*"
+  from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200
 
-# Your SPA redirect
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
+# ✅ SPA catch-all (must be last)
 [[redirects]]
   from = "/*"
   to = "/index.html"
