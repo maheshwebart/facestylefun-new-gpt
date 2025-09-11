@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { editImageWithGemini } from "../services/geminiService";
+import { editImageWithGemini } from "./services/geminiService";
 import type { ImageData } from "./types";
 import PromptBar from "./components/PromptBar";
 
