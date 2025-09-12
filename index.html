@@ -1,37 +1,15 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>facestyle.fun</title>
-  <link rel="stylesheet" href="/index.css" />
+  <title>FaceStyle</title>
 </head>
 
 <body>
   <div id="root"></div>
-
-  <PayPalScriptProvider options={{ "client-id" : import.meta.env.VITE_PAYPAL_CLIENT_ID, // ✅ Netlify injects this
-    currency: "USD" , intent: "capture" , components: "buttons" }}>
-    <PayPalButtons createOrder={async ()=> {
-      const res = await fetch("/.netlify/functions/create-order", { method: "POST" });
-      const { id } = await res.json();
-      return id;
-      }}
-      onApprove={async (data) => {
-      await fetch("/.netlify/functions/capture-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ orderID: data.orderID })
-      });
-      alert("Payment successful, credits added!");
-      }}
-      />
-  </PayPalScriptProvider>
-
-
-  <!-- We load PayPal SDK dynamically inside the component using VITE_PAYPAL_CLIENT_ID -->
-  <script type="module" src="/src/index.tsx"></script>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 
 </html>

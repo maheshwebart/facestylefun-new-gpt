@@ -3,6 +3,7 @@ import { editImageWithGemini } from "./services/geminiService";
 import type { ImageData } from "./types";
 import PromptBar from "./components/PromptBar";
 import PayPalBuy from "./components/PayPalBuy";
+import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 
 const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];
 const FEMALE_HAIR = ["Pixie Cut", "Side-Swept Bangs", "Layered Medium", "Messy Bun", "Braided Crown"];
@@ -215,51 +216,6 @@ export default function App() {
           </div>
         </section>
 
-
-
-        import {PayPalScriptProvider, PayPalButtons} from "@paypal/react-paypal-js";
-
-        export default function App() {
-  return (
-        <div className="p-6">
-          <h2>Buy Credits</h2>
-
-          <PayPalScriptProvider options={{
-            "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID, // set in Netlify env
-            currency: "USD",
-            intent: "capture",
-            components: "buttons",
-          }}>
-            <PayPalButtons
-              createOrder={async () => {
-                const res = await fetch("/.netlify/functions/create-order", { method: "POST" });
-                const { id } = await res.json();
-                return id;
-              }}
-              onApprove={async (data) => {
-                await fetch("/.netlify/functions/capture-order", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ orderID: data.orderID }),
-                });
-                alert("Payment successful, credits added!");
-              }}
-              onError={(err) => {
-                console.error(err);
-                alert("Payment error. Please try again.");
-              }}
-            />
-          </PayPalScriptProvider>
-        </div>
-        );
-}
-
-
-
-
-
-
-
         {/* Style Editor */}
         <section className="panel">
           <h2>Style Editor</h2>
@@ -335,26 +291,35 @@ export default function App() {
           <h2>Buy Credits</h2>
           {!email && <p className="hint">Enter your email in the header to receive credits.</p>}
           {email && (
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-              <div>
-                <div>5 credits — $3</div>
-                <PayPalBuy
-                  email={email}
-                  pack="5"
-                  onSuccess={(newCredits) => { setCredits(newCredits); alert("5 credits added!"); }}
-                  onError={(m) => alert(m)}
-                />
+            <PayPalScriptProvider
+              options={{
+                "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID,
+                currency: "USD",
+                intent: "capture",
+                components: "buttons",
+              }}
+            >
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                <div>
+                  <div>5 credits — $3</div>
+                  <PayPalBuy
+                    email={email}
+                    pack="5"
+                    onSuccess={(newCredits) => { setCredits(newCredits); alert("5 credits added!"); }}
+                    onError={(m) => alert(m)}
+                  />
+                </div>
+                <div>
+                  <div>20 credits — $9</div>
+                  <PayPalBuy
+                    email={email}
+                    pack="20"
+                    onSuccess={(newCredits) => { setCredits(newCredits); alert("20 credits added!"); }}
+                    onError={(m) => alert(m)}
+                  />
+                </div>
               </div>
-              <div>
-                <div>20 credits — $9</div>
-                <PayPalBuy
-                  email={email}
-                  pack="20"
-                  onSuccess={(newCredits) => { setCredits(newCredits); alert("20 credits added!"); }}
-                  onError={(m) => alert(m)}
-                />
-              </div>
-            </div>
+            </PayPalScriptProvider>
           )}
         </section>
       </main>
