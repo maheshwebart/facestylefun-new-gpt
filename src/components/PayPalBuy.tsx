@@ -68,4 +68,4 @@ export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
 
     return <div ref={containerRef} />;
 }
-export
+export { PayPalBuy };
