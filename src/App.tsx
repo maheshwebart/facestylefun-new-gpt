@@ -215,6 +215,51 @@ export default function App() {
           </div>
         </section>
 
+
+
+        import {PayPalScriptProvider, PayPalButtons} from "@paypal/react-paypal-js";
+
+        export default function App() {
+  return (
+        <div className="p-6">
+          <h2>Buy Credits</h2>
+
+          <PayPalScriptProvider options={{
+            "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID, // set in Netlify env
+            currency: "USD",
+            intent: "capture",
+            components: "buttons",
+          }}>
+            <PayPalButtons
+              createOrder={async () => {
+                const res = await fetch("/.netlify/functions/create-order", { method: "POST" });
+                const { id } = await res.json();
+                return id;
+              }}
+              onApprove={async (data) => {
+                await fetch("/.netlify/functions/capture-order", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ orderID: data.orderID }),
+                });
+                alert("Payment successful, credits added!");
+              }}
+              onError={(err) => {
+                console.error(err);
+                alert("Payment error. Please try again.");
+              }}
+            />
+          </PayPalScriptProvider>
+        </div>
+        );
+}
+
+
+
+
+
+
+
         {/* Style Editor */}
         <section className="panel">
           <h2>Style Editor</h2>
