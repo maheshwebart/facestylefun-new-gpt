@@ -1,20 +1,23 @@
-const { PAYPAL_API, getAccessToken } = require("./_paypal.js");
+import { PAYPAL_API, getAccessToken } from "./_paypal.js";
 
-exports.handler = async () => {
-    const accessToken = await getAccessToken();
+export default async () => {
+  const accessToken = await getAccessToken();
 
-    const res = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-            intent: "CAPTURE",
-            purchase_units: [{ amount: { currency_code: "USD", value: "5.00" } }]
-        })
-    });
+  const res = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      intent: "CAPTURE",
+      purchase_units: [{ amount: { currency_code: "USD", value: "5.00" } }],
+    }),
+  });
 
-    const json = await res.json();
-    return { statusCode: 200, body: JSON.stringify({ id: json.id }) };
+  const json = await res.json();
+  return new Response(JSON.stringify({ id: json.id }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
 };
