@@ -4,6 +4,7 @@ import type { ImageData } from "./types";
 import PromptBar from "./components/PromptBar";
 import PayPalBuy from "./components/PayPalBuy";
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
+import RazorpayButton from "./components/RazorpayButton";
 
 const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];
 const FEMALE_HAIR = ["Pixie Cut", "Side-Swept Bangs", "Layered Medium", "Messy Bun", "Braided Crown"];
@@ -196,6 +197,18 @@ export default function App() {
               <input ref={fileInputRef} type="file" accept="image/*" onChange={onFilePicked} hidden />
             </div>
           </div>
+
+
+
+
+          export default function App() {
+  return (
+          <div className="page">
+            <h1 className="brand">Buy Credits</h1>
+            <RazorpayButton />
+          </div>
+          );
+}
 
           <div className="previewRow">
             {originalImage && (
