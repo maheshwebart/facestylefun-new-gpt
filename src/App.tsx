@@ -286,18 +286,15 @@ export default function App() {
           {error && <p className="error mt">{error}</p>}
         </section>
 
-        {/* Buy Credits */}
-        {/* --- Buy Credits --- */}
         <section className="buy-credits" style={{ marginTop: 24 }}>
           <h2>Buy Credits</h2>
           <p>5 credits — $3 &nbsp;&nbsp; 20 credits — $9</p>
 
-          {/* One button per pack; remove any old <pre>/<code> snippets below this */}
-          <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 16 }}>
             <div>
               <div style={{ marginBottom: 8 }}>Buy 5 credits</div>
               <PayPalBuy
-                email={email /* whatever state you already use */}
+                email={email}
                 pack="5"
                 onSuccess={(newCredits) => setCredits(newCredits)}
                 onError={(m) => alert(m)}
@@ -315,6 +312,7 @@ export default function App() {
             </div>
           </div>
         </section>
+
 
       </main>
 
