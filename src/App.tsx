@@ -6,10 +6,16 @@ import PromptBar from "./components/PromptBar";
 import PayPalBuy from "./components/PayPalBuy";
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 
+// ✅ NEW: Supabase client
+import { createClient } from "@supabase/supabase-js";
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const supabase = createClient(supabaseUrl, supabaseAnon);
+
 const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];
 const FEMALE_HAIR = ["Pixie Cut", "Side-Swept Bangs", "Layered Medium", "Messy Bun", "Braided Crown"];
 const MALE_HAIR = ["Modern Fade", "Buzz Cut", "Slicked Back", "Curly Top", "Afro"];
-
 const BEARD_STYLES = ["Clean Shaven", "Light Stubble", "Full Beard", "Goatee", "Van Dyke", "Mutton Chops"];
 const GLASSES_STYLES = ["Aviators", "Wayfarers", "Round", "Sporty", "Clubmasters"];
 const CORRECTIONS = ["Brighten Face"];
@@ -44,16 +50,37 @@ export default function App() {
     if (v === "true") setConsent(true); else setShowTerms(true);
   }, []);
 
+  // 🔄 Load credits from Supabase when email changes
   useEffect(() => { refreshCredits(); }, [email]);
+
+  async function ensureProfile(emailAddr: string) {
+    // Upsert a profile row if it doesn't exist (credits default 0)
+    await supabase
+      .from("profiles")
+      .upsert({ email: emailAddr, credits: 0 }, { onConflict: "email", ignoreDuplicates: false });
+  }
 
   async function refreshCredits() {
     if (!email) return;
     try {
-      const r = await fetch("/api/credits", { headers: { "x-user-email": email } });
-      if (!r.ok) return;
-      const j = await r.json();
-      if (typeof j.credits === "number") setCredits(j.credits);
-    } catch { }
+      // make sure a row exists
+      await ensureProfile(email);
+
+      const { data, error: qErr } = await supabase
+        .from("profiles")
+        .select("credits")
+        .eq("email", email)
+        .single();
+
+      if (qErr) {
+        // If RLS blocks direct select, you can fall back to your function endpoint
+        // or adjust policy. For now, just ignore and keep previous credits in UI.
+        return;
+      }
+      if (data && typeof data.credits === "number") setCredits(data.credits);
+    } catch {
+      // ignore UI errors for MVP
+    }
   }
 
   async function fileToImageData(file: File): Promise<ImageData> {
@@ -140,6 +167,7 @@ export default function App() {
       const out = await editImageWithGemini(originalImage, prompt, referenceImage);
       setEditedImage(out);
 
+      // Deduct 1 credit SECURELY via server function (which writes to Supabase)
       if (email) {
         const r = await fetch("/api/credits", {
           method: "POST",
@@ -148,7 +176,10 @@ export default function App() {
         });
         if (r.ok) {
           const j = await r.json(); setCredits(j.credits);
-        } else { setCredits(c => c - 1); }
+        } else {
+          // Fallback UI-only decrement to avoid user confusion
+          setCredits(c => c - 1);
+        }
       } else {
         setCredits(c => c - 1);
       }
@@ -176,6 +207,7 @@ export default function App() {
           placeholder="Email to save credits"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onBlur={refreshCredits} // load when user finishes typing
         />
         <span className="credits">{credits} Credits</span>
       </header>
@@ -306,7 +338,7 @@ export default function App() {
                   <PayPalBuy
                     email={email}
                     pack="5"
-                    onSuccess={(newCredits) => { setCredits(newCredits); alert("5 credits added!"); }}
+                    onSuccess={(newCredits) => { setCredits(newCredits); }}
                     onError={(m) => alert(m)}
                   />
                 </div>
@@ -315,7 +347,7 @@ export default function App() {
                   <PayPalBuy
                     email={email}
                     pack="20"
-                    onSuccess={(newCredits) => { setCredits(newCredits); alert("20 credits added!"); }}
+                    onSuccess={(newCredits) => { setCredits(newCredits); }}
                     onError={(m) => alert(m)}
                   />
                 </div>
