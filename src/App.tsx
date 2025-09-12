@@ -13,6 +13,8 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const supabase = createClient(supabaseUrl, supabaseAnon);
 
+
+
 const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];
 const FEMALE_HAIR = ["Pixie Cut", "Side-Swept Bangs", "Layered Medium", "Messy Bun", "Braided Crown"];
 const MALE_HAIR = ["Modern Fade", "Buzz Cut", "Slicked Back", "Curly Top", "Afro"];
@@ -39,6 +41,21 @@ export default function App() {
   const [editedImage, setEditedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const buyRef = useRef<HTMLDivElement>(null);
+  const [showInlinePaywall, setShowInlinePaywall] = useState(false);
+
+  function nudgeToBuy() {
+    setShowInlinePaywall(true);
+    // Scroll to main Buy Credits section if present
+    buyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  if (credits <= 0) {
+    setError("No credits left. Please purchase more to continue.");
+    nudgeToBuy();
+    return;
+  }
 
   // upload helpers
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -120,6 +137,60 @@ export default function App() {
     if (!consent) { setShowTerms(true); return; }
     await onUploadOriginal(e);
   }
+
+
+  {/* Buy Credits */ }
+  <section className="panel" ref={buyRef}>
+    <h2>Buy Credits</h2>
+    {!email && <p className="hint">Enter your email in the header to receive credits.</p>}
+    ...
+  </section>
+
+
+  {/* Inline paywall when out of credits and email provided */ }
+  {
+    (credits <= 0 && email) && (
+      <div className="mt" style={{ border: "1px solid #334", padding: 12, borderRadius: 8 }}>
+        <h4>Buy Credits to Continue</h4>
+        <PayPalScriptProvider
+          options={{
+            "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID,
+            currency: "USD",
+            intent: "capture",
+            components: "buttons",
+          }}
+        >
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+            <div>
+              <div>5 credits — $3</div>
+              <PayPalBuy
+                email={email}
+                pack="5"
+                onSuccess={(newCredits) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
+                onError={(m) => alert(m)}
+              />
+            </div>
+            <div>
+              <div>20 credits — $9</div>
+              <PayPalBuy
+                email={email}
+                pack="20"
+                onSuccess={(newCredits) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
+                onError={(m) => alert(m)}
+              />
+            </div>
+          </div>
+        </PayPalScriptProvider>
+      </div>
+    )
+  }
+
+
+
+
+
+
+
 
   function downloadEdited() {
     if (!editedImage) return;
