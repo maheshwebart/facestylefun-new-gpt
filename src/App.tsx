@@ -1,20 +1,18 @@
-import { Studio } from "./studio";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { editImageWithGemini } from "./services/geminiService";
 import type { ImageData } from "./types";
 import PromptBar from "./components/PromptBar";
-import PayPalBuy from "./components/PayPalBuy";
+import { PayPalBuy } from "./components/PayPalBuy";
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
-
-// ✅ NEW: Supabase client
 import { createClient } from "@supabase/supabase-js";
 
+// ---------- Config ----------
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
 const supabase = createClient(supabaseUrl, supabaseAnon);
 
-
-
+// ---------- Options ----------
 const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];
 const FEMALE_HAIR = ["Pixie Cut", "Side-Swept Bangs", "Layered Medium", "Messy Bun", "Braided Crown"];
 const MALE_HAIR = ["Modern Fade", "Buzz Cut", "Slicked Back", "Curly Top", "Afro"];
@@ -23,6 +21,7 @@ const GLASSES_STYLES = ["Aviators", "Wayfarers", "Round", "Sporty", "Clubmasters
 const CORRECTIONS = ["Brighten Face"];
 
 export default function App() {
+  // ---------- State ----------
   const [credits, setCredits] = useState<number>(3);
   const [email, setEmail] = useState(localStorage.getItem("fsf_email") || "");
   const [gender, setGender] = useState<"auto" | "female" | "male" | "other">("auto");
@@ -42,36 +41,40 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const buyRef = useRef<HTMLDivElement>(null);
-  const [showInlinePaywall, setShowInlinePaywall] = useState(false);
-
-  function nudgeToBuy() {
-    setShowInlinePaywall(true);
-    // Scroll to main Buy Credits section if present
-    buyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  if (credits <= 0) {
-    setError("No credits left. Please purchase more to continue.");
-    nudgeToBuy();
-    return;
-  }
-
-  // upload helpers
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
+  const buyRef = useRef<HTMLDivElement>(null);
+  const [showInlinePaywall, setShowInlinePaywall] = useState(false);
+
+  // ---------- Effects ----------
+  // persist email locally
   useEffect(() => { localStorage.setItem("fsf_email", email); }, [email]);
+
+  // consent gate
   useEffect(() => {
     const v = localStorage.getItem("fsf_consent");
-    if (v === "true") setConsent(true); else setShowTerms(true);
+    if (v === "true") setConsent(true);
+    else setShowTerms(true);
   }, []);
 
-  // 🔄 Load credits from Supabase when email changes
+  // show inline paywall if credits depleted
+  useEffect(() => {
+    if (credits <= 0) {
+      setError("No credits left. Please purchase more to continue.");
+      setShowInlinePaywall(true);
+      buyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else {
+      setShowInlinePaywall(false);
+    }
+  }, [credits]);
+
+  // load credits from Supabase on email change
   useEffect(() => { refreshCredits(); }, [email]);
 
+  // ---------- Supabase helpers ----------
   async function ensureProfile(emailAddr: string) {
-    // Upsert a profile row if it doesn't exist (credits default 0)
+    if (!emailAddr) return;
     await supabase
       .from("profiles")
       .upsert({ email: emailAddr, credits: 0 }, { onConflict: "email", ignoreDuplicates: false });
@@ -80,30 +83,24 @@ export default function App() {
   async function refreshCredits() {
     if (!email) return;
     try {
-      // make sure a row exists
       await ensureProfile(email);
-
       const { data, error: qErr } = await supabase
         .from("profiles")
         .select("credits")
         .eq("email", email)
         .single();
-
-      if (qErr) {
-        // If RLS blocks direct select, you can fall back to your function endpoint
-        // or adjust policy. For now, just ignore and keep previous credits in UI.
-        return;
-      }
-      if (data && typeof data.credits === "number") setCredits(data.credits);
+      if (!qErr && data && typeof data.credits === "number") setCredits(data.credits);
     } catch {
-      // ignore UI errors for MVP
+      // ignore for MVP
     }
   }
 
+  // ---------- File helpers ----------
   async function fileToImageData(file: File): Promise<ImageData> {
     const reader = new FileReader();
     return await new Promise((res, rej) => {
-      reader.onloadend = () => res({ base64: String(reader.result).split(",")[1], mimeType: file.type });
+      reader.onloadend = () =>
+        res({ base64: String(reader.result).split(",")[1], mimeType: file.type });
       reader.onerror = rej;
       reader.readAsDataURL(file);
     });
@@ -138,60 +135,7 @@ export default function App() {
     await onUploadOriginal(e);
   }
 
-
-  {/* Buy Credits */ }
-  <section className="panel" ref={buyRef}>
-    <h2>Buy Credits</h2>
-    {!email && <p className="hint">Enter your email in the header to receive credits.</p>}
-    ...
-  </section>
-
-
-  {/* Inline paywall when out of credits and email provided */ }
-  {
-    (credits <= 0 && email) && (
-      <div className="mt" style={{ border: "1px solid #334", padding: 12, borderRadius: 8 }}>
-        <h4>Buy Credits to Continue</h4>
-        <PayPalScriptProvider
-          options={{
-            "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID,
-            currency: "USD",
-            intent: "capture",
-            components: "buttons",
-          }}
-        >
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-            <div>
-              <div>5 credits — $3</div>
-              <PayPalBuy
-                email={email}
-                pack="5"
-                onSuccess={(newCredits) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
-                onError={(m) => alert(m)}
-              />
-            </div>
-            <div>
-              <div>20 credits — $9</div>
-              <PayPalBuy
-                email={email}
-                pack="20"
-                onSuccess={(newCredits) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
-                onError={(m) => alert(m)}
-              />
-            </div>
-          </div>
-        </PayPalScriptProvider>
-      </div>
-    )
-  }
-
-
-
-
-
-
-
-
+  // ---------- UI helpers ----------
   function downloadEdited() {
     if (!editedImage) return;
     const a = document.createElement("a");
@@ -227,6 +171,7 @@ export default function App() {
     return parts.join(". ") || "";
   }
 
+  // ---------- Run edit ----------
   async function runStyle(prompt: string) {
     if (!consent) { setShowTerms(true); return; }
     if (!originalImage) { setError("Please upload a profile photo first."); return; }
@@ -238,7 +183,7 @@ export default function App() {
       const out = await editImageWithGemini(originalImage, prompt, referenceImage);
       setEditedImage(out);
 
-      // Deduct 1 credit SECURELY via server function (which writes to Supabase)
+      // deduct 1 credit via server
       if (email) {
         const r = await fetch("/api/credits", {
           method: "POST",
@@ -248,8 +193,7 @@ export default function App() {
         if (r.ok) {
           const j = await r.json(); setCredits(j.credits);
         } else {
-          // Fallback UI-only decrement to avoid user confusion
-          setCredits(c => c - 1);
+          setCredits(c => c - 1); // UI fallback
         }
       } else {
         setCredits(c => c - 1);
@@ -267,6 +211,7 @@ export default function App() {
   function acceptTerms() { setConsent(true); localStorage.setItem("fsf_consent", "true"); setShowTerms(false); }
   function declineTerms() { setConsent(false); setShowTerms(true); }
 
+  // ---------- Render ----------
   return (
     <div className="page">
       <header className="brand">
@@ -278,7 +223,7 @@ export default function App() {
           placeholder="Email to save credits"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          onBlur={refreshCredits} // load when user finishes typing
+          onBlur={refreshCredits}
         />
         <span className="credits">{credits} Credits</span>
       </header>
@@ -383,6 +328,37 @@ export default function App() {
             disabled={loading}
           />
 
+          {/* Inline paywall when out of credits */}
+          {showInlinePaywall && email && paypalClientId && (
+            <div className="mt" style={{ border: "1px solid #334", padding: 12, borderRadius: 8 }}>
+              <h4>Buy Credits to Continue</h4>
+              <PayPalScriptProvider
+                options={{ "client-id": paypalClientId, currency: "USD", intent: "capture", components: "buttons" }}
+              >
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                  <div>
+                    <div>5 credits — $3</div>
+                    <PayPalBuy
+                      email={email}
+                      pack="5"
+                      onSuccess={(newCredits) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
+                      onError={(m) => alert(m)}
+                    />
+                  </div>
+                  <div>
+                    <div>20 credits — $9</div>
+                    <PayPalBuy
+                      email={email}
+                      pack="20"
+                      onSuccess={(newCredits) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
+                      onError={(m) => alert(m)}
+                    />
+                  </div>
+                </div>
+              </PayPalScriptProvider>
+            </div>
+          )}
+
           <button className="primary mt" disabled={loading} onClick={applySelections}>
             {loading ? "Applying…" : "Apply Selected"}
           </button>
@@ -391,40 +367,29 @@ export default function App() {
         </section>
 
         {/* Buy Credits */}
-        <section className="panel">
+        <section className="panel" ref={buyRef}>
           <h2>Buy Credits</h2>
           {!email && <p className="hint">Enter your email in the header to receive credits.</p>}
-          {email && (
+          {email && paypalClientId ? (
             <PayPalScriptProvider
-              options={{
-                "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID,
-                currency: "USD",
-                intent: "capture",
-                components: "buttons",
-              }}
+              options={{ "client-id": paypalClientId, currency: "USD", intent: "capture", components: "buttons" }}
             >
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
                 <div>
                   <div>5 credits — $3</div>
-                  <PayPalBuy
-                    email={email}
-                    pack="5"
-                    onSuccess={(newCredits) => { setCredits(newCredits); }}
-                    onError={(m) => alert(m)}
-                  />
+                  <PayPalBuy email={email} pack="5" onSuccess={(n) => setCredits(n)} onError={(m) => alert(m)} />
                 </div>
                 <div>
                   <div>20 credits — $9</div>
-                  <PayPalBuy
-                    email={email}
-                    pack="20"
-                    onSuccess={(newCredits) => { setCredits(newCredits); }}
-                    onError={(m) => alert(m)}
-                  />
+                  <PayPalBuy email={email} pack="20" onSuccess={(n) => setCredits(n)} onError={(m) => alert(m)} />
                 </div>
               </div>
             </PayPalScriptProvider>
-          )}
+          ) : email ? (
+            <p style={{ color: "#ffb4b4" }}>
+              PayPal not configured. Set <code>VITE_PAYPAL_CLIENT_ID</code> in Netlify env vars and redeploy.
+            </p>
+          ) : null}
         </section>
       </main>
 
