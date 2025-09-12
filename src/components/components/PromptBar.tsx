@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import type { ImageData } from "../types";
+import type { ImageData } from "../../types";
 
 type Props = {
     value: string;

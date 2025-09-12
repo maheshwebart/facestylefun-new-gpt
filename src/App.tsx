@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { editImageWithGemini } from "./services/geminiService";
 import type { ImageData } from "./types";
-import PromptBar from "./components/PromptBar";
-import PayPalBuy from "./components/PayPalBuy";
+import PromptBar from "./components/components/PromptBar";
+import PayPalBuy from "./components/components/PayPalBuy";
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 
 const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];

@@ -19,6 +19,8 @@
     "baseUrl": "."
   },
   "include": [
-    "src"
+    "src",
+    "src/components/components/PromptBar.tsx",
+    "src/components/components/PayPalBuy.tsx"
   ]
 }

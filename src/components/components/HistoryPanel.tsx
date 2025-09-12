@@ -1,6 +1,6 @@
 import React from 'react';
 import Button from './Button';
-import type { HistoryItem } from '../src/types';
+import type { HistoryItem } from '../../types';
 
 interface HistoryPanelProps {
   history: HistoryItem[];
