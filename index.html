@@ -9,6 +9,57 @@
 
 <body>
   <div id="root"></div>
+<<<<<<< HEAD
+=======
+
+  <!-- index.html -->
+  <div id="paypal-buttons"></div>
+  <script type="module">
+    import { loadScript } from "https://www.paypal.com/sdk/js?client-id=YOUR_CLIENT_ID&currency=USD&intent=CAPTURE&components=buttons";
+
+    // If you prefer dynamic loader:
+    // import { loadScript } from "https://www.unpkg.com/@paypal/paypal-js@9/dist/esm/paypal-js.js";
+
+    (async () => {
+      try {
+        const paypal = await window.paypal ? Promise.resolve(window.paypal) : loadScript({
+          "client-id": "YOUR_CLIENT_ID",
+          currency: "USD",
+          intent: "capture",
+          components: "buttons",
+        });
+
+        paypal.Buttons({
+          createOrder: async () => {
+            // Call your serverless function to create the order
+            const res = await fetch("/.netlify/functions/create-order", { method: "POST" });
+            const { id } = await res.json();
+            return id;
+          },
+          onApprove: async (data) => {
+            // Capture on server for security + credits logic
+            const res = await fetch("/.netlify/functions/capture-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderID: data.orderID })
+            });
+            const out = await res.json();
+            alert("Payment successful. Credits added!");
+          },
+          onError: (err) => {
+            console.error(err);
+            alert("Payment error. Please try again.");
+          }
+        }).render("#paypal-buttons");
+      } catch (e) {
+        console.error(e);
+        alert("failed to load paypal sdk");
+      }
+    })();
+  </script>
+
+  <!-- We load PayPal SDK dynamically inside the component using VITE_PAYPAL_CLIENT_ID -->
+>>>>>>> parent of 55b7690 (paypal intergration)
   <script type="module" src="/src/index.tsx"></script>
 </body>
 
