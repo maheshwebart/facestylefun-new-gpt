@@ -14,7 +14,7 @@ const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", 
 
 // ---------- Config ----------
 
-const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
+//const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
 
 
 // ---------- Options ----------
