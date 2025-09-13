@@ -25,7 +25,7 @@ const CORRECTIONS = ["Brighten Face"];
 export default function App() {
   // ---------- State ----------
   const [credits, setCredits] = useState<number>(0); // start at 0; real value loaded from Supabase
-  const [email, setEmail] = useState(localStorage.getItem("fsf_email") || "");
+
   const [gender, setGender] = useState<"auto" | "female" | "male" | "other">("auto");
   const [consent, setConsent] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
