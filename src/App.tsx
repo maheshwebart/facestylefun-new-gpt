@@ -4,7 +4,7 @@ import type { ImageData } from "./types";
 import PromptBar from "./components/PromptBar";
 import PayPalBuy from "./components/PayPalBuy";
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
-import { supabase } from "./lib/supabase";            // ✅ use the shared client only
+// ✅ use the shared client only
 import AuthButton from "./components/AuthButton";
 
 const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined; // ✅ ok
