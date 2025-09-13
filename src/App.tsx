@@ -5,6 +5,8 @@ import PromptBar from "./components/PromptBar";
 import PayPalBuy from "./components/PayPalBuy"; // named export as in your current code
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 import { createClient } from "@supabase/supabase-js";
+import { supabase } from "./lib/supabase";
+import AuthButton from "./components/AuthButton";
 
 // ---------- Config ----------
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
@@ -46,6 +48,32 @@ export default function App() {
 
   const buyRef = useRef<HTMLDivElement>(null);
   const [showInlinePaywall, setShowInlinePaywall] = useState(false);
+
+  const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
+  const email = session?.user?.email ?? "";  // <-- replaces manual email input
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => { sub.subscription.unsubscribe(); };
+  }, []);
+
+  // Ensure profile + grant 1 free credit once
+  async function provisionOnFirstLogin(userEmail: string) {
+    // columns: email (unique), credits int default 0, got_free_credit boolean default false
+    await supabase.from("profiles").upsert({ email: userEmail }, { onConflict: "email" });
+    const { data } = await supabase.from("profiles").select("credits, got_free_credit").eq("email", userEmail).single();
+    if (data && !data.got_free_credit) {
+      await supabase.from("profiles")
+        .update({ credits: (data.credits ?? 0) + 1, got_free_credit: true })
+        .eq("email", userEmail);
+    }
+  }
+
+  // when session appears, provision + refresh credits
+  useEffect(() => {
+    if (email) { (async () => { await provisionOnFirstLogin(email); await refreshCredits(); })(); }
+  }, [email]);
 
   // ---------- Effects ----------
   // persist email locally
@@ -502,15 +530,11 @@ export default function App() {
         </section>
 
         {/* Buy Credits (no PayPal configured) */}
-        <section className="panel" ref={buyRef}>
-          <h2>Buy Credits</h2>
-          {!email && <p className="hint">Enter your email in the header to receive credits.</p>}
-          {email && !paypalClientId && (
-            <p style={{ color: "#ffb4b4" }}>
-              PayPal not configured. Set <code>VITE_PAYPAL_CLIENT_ID</code> in Netlify env vars and redeploy.
-            </p>
-          )}
-        </section>
+        <header className="brand">
+          <span className="logo">facestyle.fun</span>
+          <div className="spacer" />
+          {session ? <span className="credits">{credits} Credits</span> : <AuthButton />}
+        </header>
       </main>
     );
 

@@ -1,5 +1,10 @@
 {
   "compilerOptions": {
+    // or "react-jsx" if using React 17+/Vite
+    "types": [
+      "react",
+      "react-dom"
+    ],
     "target": "ESNext",
     "lib": [
       "DOM",

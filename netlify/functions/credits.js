@@ -1,6 +1,5 @@
 import { getCredits, deductCredits } from "./_credits-lib.js";
 
-
 export default async (req) => {
     const email = req.headers.get("x-user-email");
     if (!email) return new Response("Missing x-user-email", { status: 400 });
