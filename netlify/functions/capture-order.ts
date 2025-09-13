@@ -7,7 +7,6 @@ const supabaseAnon = process.env.VITE_SUPABASE_ANON_KEY!;
 // const supabaseService = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 // const supabase = createClient(supabaseUrl, supabaseService);
 
-const supabase = createClient(supabaseUrl, supabaseAnon);
 
 export const handler: Handler = async (event) => {
     try {

@@ -2,17 +2,20 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { editImageWithGemini } from "./services/geminiService";
 import type { ImageData } from "./types";
 import PromptBar from "./components/PromptBar";
-import PayPalBuy from "./components/PayPalBuy"; // named export as in your current code
+import PayPalBuy from "./components/PayPalBuy";
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
-import { createClient } from "@supabase/supabase-js";
-import { supabase } from "./lib/supabase";
+import { supabase } from "./lib/supabase";            // ✅ use the shared client only
 import AuthButton from "./components/AuthButton";
 
+const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined; // ✅ ok
+
+// ---------- Options ----------
+const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];
+
 // ---------- Config ----------
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
 const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined;
-const supabase = createClient(supabaseUrl, supabaseAnon);
+
 
 // ---------- Options ----------
 const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];
@@ -21,6 +24,16 @@ const MALE_HAIR = ["Modern Fade", "Buzz Cut", "Slicked Back", "Curly Top", "Afro
 const BEARD_STYLES = ["Clean Shaven", "Light Stubble", "Full Beard", "Goatee", "Van Dyke", "Mutton Chops"];
 const GLASSES_STYLES = ["Aviators", "Wayfarers", "Round", "Sporty", "Clubmasters"];
 const CORRECTIONS = ["Brighten Face"];
+
+// in App.tsx (top of component)
+const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
+useEffect(() => {
+  supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+  const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+  return () => { sub.subscription.unsubscribe(); };
+}, []);
+const email = session?.user?.email ?? "";
+
 
 export default function App() {
   // ---------- State ----------
