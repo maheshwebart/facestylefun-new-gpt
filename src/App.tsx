@@ -6,6 +6,18 @@ import PayPalBuy from "./components/PayPalBuy";
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 // ✅ use the shared client only
 import AuthButton from "./components/AuthButton";
+import { supabase } from "./lib/supabase";
+
+// Add this declaration to fix import.meta.env typing error
+declare global {
+  interface ImportMetaEnv {
+    VITE_PAYPAL_CLIENT_ID?: string;
+    // add other env vars here as needed
+  }
+  interface ImportMeta {
+    env: ImportMetaEnv;
+  }
+}
 
 
 
@@ -30,8 +42,10 @@ const CORRECTIONS = ["Brighten Face"];
 // in App.tsx (top of component)
 const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
 useEffect(() => {
-  supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
-  const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+  supabase.auth.getSession().then(({ data }: { data: { session: import("@supabase/supabase-js").Session | null } }) => setSession(data.session ?? null));
+  const { data: sub } = supabase.auth.onAuthStateChange(
+    (_e: string | null, s: import("@supabase/supabase-js").Session | null) => setSession(s)
+  );
   return () => { sub.subscription.unsubscribe(); };
 }, []);
 const email = session?.user?.email ?? "";
@@ -65,13 +79,24 @@ export default function App() {
   const [showInlinePaywall, setShowInlinePaywall] = useState(false);
 
   const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
-  const email = session?.user?.email ?? "";  // <-- replaces manual email input
+  const [email, setEmail] = useState("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => { sub.subscription.unsubscribe(); };
   }, []);
+
+  return (
+    <div>
+      <h1>FaceStyleFun</h1>
+      <input
+        type="email"
+        placeholder="Enter your email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+      />
+      <p>Your email: {email}</p>
 
   // Ensure profile + grant 1 free credit once
   async function provisionOnFirstLogin(userEmail: string) {
@@ -262,7 +287,7 @@ export default function App() {
   const payPalProvider =
     paypalClientId && email ? (
       <PayPalScriptProvider
-        options={{ "client-id": paypalClientId, currency: "USD", intent: "capture", components: "buttons" }}
+        options={{ clientId: paypalClientId, currency: "USD", intent: "capture", components: "buttons" }}
       >
         {/* Children below */}
         <main className="container">
