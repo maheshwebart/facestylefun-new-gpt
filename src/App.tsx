@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { editImageWithGemini } from "./services/geminiService";
 import type { ImageData } from "./types";
 import PromptBar from "./components/PromptBar";
-import { PayPalBuy } from "./components/PayPalBuy";
+import { PayPalBuy } from "./components/PayPalBuy"; // named export as in your current code
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 import { createClient } from "@supabase/supabase-js";
 
@@ -22,7 +22,7 @@ const CORRECTIONS = ["Brighten Face"];
 
 export default function App() {
   // ---------- State ----------
-  const [credits, setCredits] = useState<number>(3);
+  const [credits, setCredits] = useState<number>(0); // start at 0; real value loaded from Supabase
   const [email, setEmail] = useState(localStorage.getItem("fsf_email") || "");
   const [gender, setGender] = useState<"auto" | "female" | "male" | "other">("auto");
   const [consent, setConsent] = useState(false);
@@ -73,14 +73,17 @@ export default function App() {
   useEffect(() => { refreshCredits(); }, [email]);
 
   // ---------- Supabase helpers ----------
-  async function ensureProfile(emailAddr: string) {
+  const ensureProfile = useCallback(async (emailAddr: string) => {
     if (!emailAddr) return;
     await supabase
       .from("profiles")
-      .upsert({ email: emailAddr, credits: 0 }, { onConflict: "email", ignoreDuplicates: false });
-  }
+      .upsert(
+        { email: emailAddr, credits: 0 },
+        { onConflict: "email", ignoreDuplicates: false }
+      );
+  }, []);
 
-  async function refreshCredits() {
+  const refreshCredits = useCallback(async () => {
     if (!email) return;
     try {
       await ensureProfile(email);
@@ -93,7 +96,7 @@ export default function App() {
     } catch {
       // ignore for MVP
     }
-  }
+  }, [email, ensureProfile]);
 
   // ---------- File helpers ----------
   async function fileToImageData(file: File): Promise<ImageData> {
@@ -212,22 +215,185 @@ export default function App() {
   function declineTerms() { setConsent(false); setShowTerms(true); }
 
   // ---------- Render ----------
-  return (
-    <div className="page">
-      <header className="brand">
-        <span className="logo">facestyle.fun</span>
-        <div className="spacer" />
-        <input
-          className="textInput"
-          style={{ width: 220, marginRight: 8 }}
-          placeholder="Email to save credits"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onBlur={refreshCredits}
-        />
-        <span className="credits">{credits} Credits</span>
-      </header>
+  // Wrap the entire app in ONE PayPalScriptProvider to avoid double-mounting buttons
+  const payPalProvider =
+    paypalClientId && email ? (
+      <PayPalScriptProvider
+        options={{ "client-id": paypalClientId, currency: "USD", intent: "capture", components: "buttons" }}
+      >
+        {/* Children below */}
+        <main className="container">
+          {/* Upload */}
+          <section className="panel">
+            <h2>Upload</h2>
+            <div
+              className={`dropzone ${dragOver ? "is-drag" : ""}`}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
+            >
+              <div className="dz-inner">
+                <div className="dz-icon">📤</div>
+                <div className="dz-text"><strong>Drag & drop</strong> your profile photo here<br />or</div>
+                <button className="btn btn-file" type="button" onClick={openFilePicker}>Choose Photo</button>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={onFilePicked} hidden />
+              </div>
+            </div>
 
+            <div className="previewRow">
+              {originalImage && (
+                <figure>
+                  <img src={`data:${originalImage.mimeType};base64,${originalImage.base64}`} alt="Original" />
+                  <figcaption>Original</figcaption>
+                </figure>
+              )}
+              {editedImage && (
+                <figure>
+                  <img src={`data:image/png;base64,${editedImage}`} alt="Edited" />
+                  <figcaption>
+                    Edited
+                    <button className="btn btn-download" type="button" onClick={downloadEdited}>⬇ Download</button>
+                  </figcaption>
+                </figure>
+              )}
+            </div>
+          </section>
+
+          {/* Style Editor */}
+          <section className="panel">
+            <h2>Style Editor</h2>
+
+            <h3>Who are we styling today?</h3>
+            <div className="radioRow">
+              {["auto", "female", "male", "other"].map((g) => (
+                <label key={g} className="radioItem">
+                  <input
+                    type="radio"
+                    name="gender"
+                    value={g}
+                    checked={gender === (g as any)}
+                    onChange={() => setGender(g as any)}
+                  />
+                  {g[0].toUpperCase() + g.slice(1)}
+                </label>
+              ))}
+            </div>
+
+            <h3 className="mt">Hairstyle</h3>
+            <div className="grid">
+              {hairList.map((n) => (
+                <button key={n} className={`tile ${hair === n ? "active" : ""}`} disabled={loading} onClick={() => toggleSingle(hair, n, setHair)}>{n}</button>
+              ))}
+            </div>
+
+            {gender !== "female" && (
+              <>
+                <h3 className="mt">Beard</h3>
+                <div className="grid">
+                  {BEARD_STYLES.map((n) => (
+                    <button key={n} className={`tile ${beard === n ? "active" : ""}`} disabled={loading} onClick={() => toggleSingle(beard, n, setBeard)}>{n}</button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            <h3 className="mt">Sunglasses</h3>
+            <div className="grid">
+              {GLASSES_STYLES.map((n) => (
+                <button key={n} className={`tile ${glasses === n ? "active" : ""}`} disabled={loading} onClick={() => toggleSingle(glasses, n, setGlasses)}>{n}</button>
+              ))}
+            </div>
+
+            <h3 className="mt">Corrections</h3>
+            <div className="grid">
+              {CORRECTIONS.map((n) => (
+                <button key={n} className={`tile ${corrections.includes(n) ? "active" : ""}`} disabled={loading} onClick={() => toggleMulti(corrections, n, setCorrections)}>{n}</button>
+              ))}
+            </div>
+
+            <h3 className="mt">Custom Adjustments</h3>
+            <p className="hint">Attach a reference via ↑ or just type like ChatGPT. Press Enter or click Apply.</p>
+            <PromptBar
+              value={customPrompt}
+              onChange={setCustomPrompt}
+              reference={referenceImage}
+              onAttach={setReferenceImage}
+              onSubmit={applySelections}
+              disabled={loading}
+            />
+
+            {/* Inline paywall when out of credits (shows PayPal buttons here) */}
+            {showInlinePaywall && email && (
+              <div className="mt" style={{ border: "1px solid #334", padding: 12, borderRadius: 8 }}>
+                <h4>Buy Credits to Continue</h4>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                  <div>
+                    <div>5 credits — $3</div>
+                    <PayPalBuy
+                      email={email}
+                      pack="5"
+                      onSuccess={(newCredits: number) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
+                      onError={(m: string) => alert(m)}
+                    />
+                  </div>
+                  <div>
+                    <div>20 credits — $9</div>
+                    <PayPalBuy
+                      email={email}
+                      pack="20"
+                      onSuccess={(newCredits: number) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
+                      onError={(m: string) => alert(m)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <button className="primary mt" disabled={loading} onClick={applySelections}>
+              {loading ? "Applying…" : "Apply Selected"}
+            </button>
+
+            {error && <p className="error mt">{error}</p>}
+          </section>
+
+          {/* Buy Credits */}
+          <section className="panel" ref={buyRef}>
+            <h2>Buy Credits</h2>
+            {!email && <p className="hint">Enter your email in the header to receive credits.</p>}
+
+            {/* To prevent duplicate buttons on the page,
+                hide this section's buttons when inline paywall is visible */}
+            {email ? (
+              showInlinePaywall ? (
+                <p className="hint">Finish the purchase above to continue.</p>
+              ) : (
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                  <div>
+                    <div>5 credits — $3</div>
+                    <PayPalBuy
+                      email={email}
+                      pack="5"
+                      onSuccess={(n: number) => setCredits(n)}
+                      onError={(m: string) => alert(m)}
+                    />
+                  </div>
+                  <div>
+                    <div>20 credits — $9</div>
+                    <PayPalBuy
+                      email={email}
+                      pack="20"
+                      onSuccess={(n: number) => setCredits(n)}
+                      onError={(m: string) => alert(m)}
+                    />
+                  </div>
+                </div>
+              )
+            ) : null}
+          </section>
+        </main>
+      </PayPalScriptProvider>
+    ) : (
+      // If no PayPal or no email yet, render the app without PayPal (with helpful hints)
       <main className="container">
         {/* Upload */}
         <section className="panel">
@@ -265,7 +431,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Style Editor */}
+        {/* Style Editor (without PayPal purchase UI) */}
         <section className="panel">
           <h2>Style Editor</h2>
 
@@ -328,37 +494,6 @@ export default function App() {
             disabled={loading}
           />
 
-          {/* Inline paywall when out of credits */}
-          {showInlinePaywall && email && paypalClientId && (
-            <div className="mt" style={{ border: "1px solid #334", padding: 12, borderRadius: 8 }}>
-              <h4>Buy Credits to Continue</h4>
-              <PayPalScriptProvider
-                options={{ "client-id": paypalClientId, currency: "USD", intent: "capture", components: "buttons" }}
-              >
-                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-                  <div>
-                    <div>5 credits — $3</div>
-                    <PayPalBuy
-                      email={email}
-                      pack="5"
-                      onSuccess={(newCredits) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
-                      onError={(m) => alert(m)}
-                    />
-                  </div>
-                  <div>
-                    <div>20 credits — $9</div>
-                    <PayPalBuy
-                      email={email}
-                      pack="20"
-                      onSuccess={(newCredits) => { setCredits(newCredits); setShowInlinePaywall(false); setError(null); }}
-                      onError={(m) => alert(m)}
-                    />
-                  </div>
-                </div>
-              </PayPalScriptProvider>
-            </div>
-          )}
-
           <button className="primary mt" disabled={loading} onClick={applySelections}>
             {loading ? "Applying…" : "Apply Selected"}
           </button>
@@ -366,32 +501,36 @@ export default function App() {
           {error && <p className="error mt">{error}</p>}
         </section>
 
-        {/* Buy Credits */}
+        {/* Buy Credits (no PayPal configured) */}
         <section className="panel" ref={buyRef}>
           <h2>Buy Credits</h2>
           {!email && <p className="hint">Enter your email in the header to receive credits.</p>}
-          {email && paypalClientId ? (
-            <PayPalScriptProvider
-              options={{ "client-id": paypalClientId, currency: "USD", intent: "capture", components: "buttons" }}
-            >
-              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-                <div>
-                  <div>5 credits — $3</div>
-                  <PayPalBuy email={email} pack="5" onSuccess={(n) => setCredits(n)} onError={(m) => alert(m)} />
-                </div>
-                <div>
-                  <div>20 credits — $9</div>
-                  <PayPalBuy email={email} pack="20" onSuccess={(n) => setCredits(n)} onError={(m) => alert(m)} />
-                </div>
-              </div>
-            </PayPalScriptProvider>
-          ) : email ? (
+          {email && !paypalClientId && (
             <p style={{ color: "#ffb4b4" }}>
               PayPal not configured. Set <code>VITE_PAYPAL_CLIENT_ID</code> in Netlify env vars and redeploy.
             </p>
-          ) : null}
+          )}
         </section>
       </main>
+    );
+
+  return (
+    <div className="page">
+      <header className="brand">
+        <span className="logo">facestyle.fun</span>
+        <div className="spacer" />
+        <input
+          className="textInput"
+          style={{ width: 220, marginRight: 8 }}
+          placeholder="Email to save credits"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={refreshCredits}
+        />
+        <span className="credits">{credits} Credits</span>
+      </header>
+
+      {payPalProvider}
 
       {showTerms && (
         <div className="modalBackdrop">

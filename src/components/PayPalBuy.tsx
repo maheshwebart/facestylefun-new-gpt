@@ -1,35 +1,40 @@
+import React from "react";
 import { PayPalButtons } from "@paypal/react-paypal-js";
 
-interface Props {
-    email: string;
-    pack: string;
-    onSuccess: (credits: number) => void;
-    onError: (msg: string) => void;
-}
+type Props = {
+    amount: string; // USD amount, e.g. "5.00"
+    onPaid: (creditsAdded: number) => Promise<void> | void;
+};
 
-export function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
+export default function PayPalBuy({ amount, onPaid }: Props) {
     return (
-        <PayPalButtons
-            style={{ layout: "vertical" }}
-            createOrder={async () => {
-                const res = await fetch("/.netlify/functions/create-order", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ pack, email }),
-                });
-                const { id } = await res.json();
-                return id;
-            }}
-            onApprove={async (data) => {
-                const res = await fetch("/.netlify/functions/capture-order", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ orderID: data.orderID, email }),
-                });
-                const { credits } = await res.json();
-                onSuccess(credits);
-            }}
-            onError={(err) => onError(err?.message || "PayPal error")}
-        />
+        <div style={{ maxWidth: 420 }}>
+            <PayPalButtons
+                style={{ layout: "vertical" }}
+                forceReRender={[amount]} // ensures re-render if amount changes
+                createOrder={async () => {
+                    const res = await fetch("/.netlify/functions/create-order", {
+                        method: "POST",
+                    });
+                    if (!res.ok) throw new Error("Failed to create order");
+                    const { id } = await res.json();
+                    return id;
+                }}
+                onApprove={async (data) => {
+                    const res = await fetch("/.netlify/functions/capture-order", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ orderID: data.orderID }),
+                    });
+                    if (!res.ok) throw new Error("Failed to capture order");
+                    const { creditsAdded = 10 } = await res.json(); // default fallback
+                    await onPaid(creditsAdded);
+                }}
+                onError={(err) => {
+                    console.error(err);
+                    alert("Payment failed. Please try again.");
+                }}
+            />
+        </div>
     );
 }
