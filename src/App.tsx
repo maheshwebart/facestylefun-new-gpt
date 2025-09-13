@@ -10,7 +10,7 @@ import AuthButton from "./components/AuthButton";
 const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined; // ✅ ok
 
 // ---------- Options ----------
-const UNISEX_HAIR = ["Long & Wavy", "Long & Straight", "Curly Shoulder Length", "Ponytail", "Bob Cut"];
+//
 
 // ---------- Config ----------
 
