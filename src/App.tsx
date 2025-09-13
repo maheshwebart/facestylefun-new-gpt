@@ -7,6 +7,8 @@ import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 // ✅ use the shared client only
 import AuthButton from "./components/AuthButton";
 
+
+
 const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string | undefined; // ✅ ok
 
 // ---------- Options ----------
