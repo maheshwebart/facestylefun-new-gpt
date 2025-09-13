@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { editImageWithGemini } from "./services/geminiService";
 import type { ImageData } from "./types";
 import PromptBar from "./components/PromptBar";
-import { PayPalBuy } from "./components/PayPalBuy"; // named export as in your current code
+import PayPalBuy from "./components/PayPalBuy"; // named export as in your current code
 import { PayPalScriptProvider } from "@paypal/react-paypal-js";
 import { createClient } from "@supabase/supabase-js";
 
