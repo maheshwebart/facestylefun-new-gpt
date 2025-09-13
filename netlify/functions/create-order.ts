@@ -22,7 +22,7 @@ export const handler: Handler = async (event) => {
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ order }),
+            body: JSON.stringify({ id: `ORDER-${Date.now()}` }),
         };
     } catch (e: any) {
         console.error(e);
