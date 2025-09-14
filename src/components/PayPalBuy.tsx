@@ -1,70 +1,170 @@
-import React, { useEffect, useRef } from "react";
+// src/components/PayPalBuy.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
 declare global {
-    interface Window { paypal?: any; }
+    interface Window {
+        paypal?: any;
+    }
 }
 
 type Props = {
     email: string;
-    pack: "5" | "20";                 // credits pack
+    pack: "5" | "20";
     onSuccess: (newCredits: number) => void;
-    onError?: (msg: string) => void;
+    onError: (message: string) => void;
 };
 
-export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
-    const containerRef = useRef<HTMLDivElement>(null);
+function loadPayPalSdk(clientId: string, currency = "USD", intent = "capture") {
+    return new Promise<void>((resolve, reject) => {
+        if (window.paypal) return resolve();
+
+        const params = new URLSearchParams({
+            "client-id": clientId,
+            currency,
+            intent,
+            components: "buttons",
+            commit: "true",
+        });
+
+        const s = document.createElement("script");
+        s.src = `https://www.paypal.com/sdk/js?${params.toString()}`;
+        s.async = true;
+        s.onload = () => (window.paypal ? resolve() : reject(new Error("PayPal SDK failed to load")));
+        s.onerror = () => reject(new Error("Failed to load PayPal SDK <script>"));
+        document.head.appendChild(s);
+    });
+}
+
+const PayPalBuy: React.FC<Props> = ({ email, pack, onSuccess, onError }) => {
+    const mountRef = useRef<HTMLDivElement>(null);
+    const [ready, setReady] = useState(false);
+
+    const { clientId, env, price, label } = useMemo(() => {
+        // Env + client id
+        const envRaw = (import.meta as any).env?.VITE_PAYPAL_ENV?.toLowerCase?.() || "sandbox";
+        const isLive = envRaw === "live";
+
+        const liveId =
+            (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID_LIVE ||
+            (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || // optional fallback
+            "";
+        const sbId =
+            (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID_SANDBOX ||
+            (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID || // optional fallback
+            "";
+
+        const cid = isLive ? liveId : sbId;
+
+        // Pack → price mapping that matches verify-paypal.js
+        const price = pack === "20" ? "9.00" : "3.00";
+        const label = pack === "20" ? "20 credits" : "5 credits";
+
+        return { clientId: cid, env: isLive ? "live" : "sandbox", price, label };
+    }, [pack]);
 
     useEffect(() => {
-        if (!email) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                if (!clientId) {
+                    throw new Error(
+                        `Missing PayPal client ID for ${env.toUpperCase()}. Set VITE_PAYPAL_CLIENT_ID_${env === "live" ? "LIVE" : "SANDBOX"}.`
+                    );
+                }
+                await loadPayPalSdk(clientId);
+                if (!cancelled) setReady(true);
+            } catch (e: any) {
+                setReady(false);
+                onError(e?.message || "Failed to initialize PayPal");
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [clientId, env, onError]);
 
-        const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID as string;
-        if (!clientId) { onError?.("Missing VITE_PAYPAL_CLIENT_ID"); return; }
+    useEffect(() => {
+        if (!ready || !mountRef.current || !window.paypal) return;
 
-        const id = "paypal-sdk";
-        const load = () => renderButtons();
+        mountRef.current.innerHTML = ""; // clear previous buttons
 
-        if (!document.getElementById(id)) {
-            const s = document.createElement("script");
-            s.id = id;
-            s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=USD`;
-            s.onload = load;
-            s.onerror = () => onError?.("Failed to load PayPal SDK");
-            document.body.appendChild(s);
-        } else {
-            load();
-        }
+        window.paypal.Buttons({
+            createOrder: (_data: any, actions: any) => {
+                try {
+                    return actions.order.create({
+                        intent: "CAPTURE",
+                        purchase_units: [
+                            {
+                                description: label,
+                                amount: { currency_code: "USD", value: price },
+                            },
+                        ],
+                        application_context: { shipping_preference: "NO_SHIPPING" },
+                    });
+                } catch (err) {
+                    onError("Failed to create PayPal order.");
+                    throw err;
+                }
+            },
 
-        function renderButtons() {
-            if (!window.paypal || !containerRef.current) return;
-            const amount = pack === "20" ? "9.00" : "3.00"; // keep in sync with verify-paypal.js
-
-            window.paypal.Buttons({
-                style: { layout: "horizontal", color: "gold", shape: "pill", label: "pay" },
-                createOrder: (_data: any, actions: any) =>
-                    actions.order.create({ purchase_units: [{ amount: { value: amount } }] }),
-                onApprove: async (_data: any, actions: any) => {
+            onApprove: async (data: any, actions: any) => {
+                try {
                     const details = await actions.order.capture();
-                    const orderID = details.id;
+                    const orderID = details?.id || data?.orderID;
+                    if (!orderID) {
+                        onError("Missing PayPal order ID after capture.");
+                        return;
+                    }
 
-                    const res = await fetch("/api/verify-paypal", {
+                    const r = await fetch("/api/verify-paypal", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ orderID, email, pack }),
                     });
-                    if (!res.ok) {
-                        const t = await res.text();
-                        onError?.(t || "Verification failed");
+
+                    if (!r.ok) {
+                        const t = await r.text().catch(() => "");
+                        onError(`Verification failed: ${t.slice(0, 200)}`);
                         return;
                     }
-                    const j = await res.json();
-                    onSuccess(j.credits);
-                },
-                onError: (err: any) => onError?.(String(err)),
-                onCancel: () => onError?.("Payment cancelled"),
-            }).render(containerRef.current);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [email, pack]);
 
-    return <div ref={containerRef} />;
-}
+                    const j = await r.json();
+                    if (j?.ok && typeof j.credits === "number") {
+                        onSuccess(j.credits);
+                    } else {
+                        onError("Payment captured, but could not update credits.");
+                    }
+                } catch (err) {
+                    onError("Failed to capture/verify PayPal transaction.");
+                    throw err;
+                }
+            },
+
+            onCancel: () => {
+                onError("Payment canceled by the buyer.");
+            },
+
+            onError: (err: any) => {
+                console.error("PayPal error", err);
+                onError("An error occurred during the PayPal flow.");
+            },
+        })
+            .render(mountRef.current)
+            .catch((err: any) => {
+                console.error("Render error:", err);
+                onError("Failed to render PayPal buttons.");
+                setReady(false);
+            });
+    }, [ready, label, price, email, pack, onSuccess, onError]);
+
+    if (!ready) {
+        return (
+            <div className="text-center p-3 bg-yellow-900/40 border border-yellow-600/60 rounded">
+                <div className="font-medium">PayPal not ready</div>
+                <div className="text-xs opacity-80">Check {env.toUpperCase()} client ID in env.</div>
+            </div>
+        );
+    }
+
+    return <div ref={mountRef} className="w-full flex justify-center" />;
+};
+
+export default PayPalBuy;

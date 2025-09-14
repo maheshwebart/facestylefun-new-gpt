@@ -291,35 +291,27 @@ export default function App() {
           <h2>Buy Credits</h2>
           {!email && <p className="hint">Enter your email in the header to receive credits.</p>}
           {email && (
-            <PayPalScriptProvider
-              options={{
-                "client-id": import.meta.env.VITE_PAYPAL_CLIENT_ID,
-                currency: "USD",
-                intent: "capture",
-                components: "buttons",
-              }}
-            >
-              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-                <div>
-                  <div>5 credits — $3</div>
-                  <PayPalBuy
-                    email={email}
-                    pack="5"
-                    onSuccess={(newCredits) => { setCredits(newCredits); alert("5 credits added!"); }}
-                    onError={(m) => alert(m)}
-                  />
-                </div>
-                <div>
-                  <div>20 credits — $9</div>
-                  <PayPalBuy
-                    email={email}
-                    pack="20"
-                    onSuccess={(newCredits) => { setCredits(newCredits); alert("20 credits added!"); }}
-                    onError={(m) => alert(m)}
-                  />
-                </div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+              <div>
+                <div>5 credits — $3</div>
+                <PayPalBuy
+                  email={email}
+                  pack="5"
+                  onSuccess={(newCredits) => { setCredits(newCredits); alert("5 credits added!"); }}
+                  onError={(m) => alert(m)}
+                />
               </div>
-            </PayPalScriptProvider>
+              <div>
+                <div>20 credits — $9</div>
+                <PayPalBuy
+                  email={email}
+                  pack="20"
+                  onSuccess={(newCredits) => { setCredits(newCredits); alert("20 credits added!"); }}
+                  onError={(m) => alert(m)}
+                />
+              </div>
+            </div>
+
           )}
         </section>
       </main>
