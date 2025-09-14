@@ -1,3 +1,4 @@
+// src/components/PayPalBuy.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 declare global { interface Window { paypal?: any } }
@@ -29,16 +30,14 @@ function loadSdk(clientId: string) {
 }
 
 export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
-    const ref = useRef<HTMLDivElement>(null);
+    const mountRef = useRef<HTMLDivElement>(null);
     const [ready, setReady] = useState(false);
 
     const { clientId, env } = useMemo(() => {
         const envRaw = (import.meta as any).env?.VITE_PAYPAL_ENV?.toLowerCase?.() || "sandbox";
         const isLive = envRaw === "live";
-        const liveId =
-            (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID_LIVE || "";
-        const sbId =
-            (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID_SANDBOX || "";
+        const liveId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID_LIVE || "";
+        const sbId = (import.meta as any).env?.VITE_PAYPAL_CLIENT_ID_SANDBOX || "";
         return { clientId: isLive ? liveId : sbId, env: isLive ? "live" : "sandbox" };
     }, []);
 
@@ -48,7 +47,6 @@ export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
                 if (!clientId) throw new Error(`Missing VITE_PAYPAL_CLIENT_ID_${env.toUpperCase()}`);
                 await loadSdk(clientId);
                 setReady(true);
-                console.log(`[PayPal] SDK ready (${env}) client=${clientId.slice(0, 8)}…`);
             } catch (e: any) {
                 onError(e?.message || "Failed to init PayPal");
             }
@@ -56,21 +54,19 @@ export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
     }, [clientId, env, onError]);
 
     useEffect(() => {
-        if (!ready || !ref.current || !window.paypal) return;
-        ref.current.innerHTML = "";
+        if (!ready || !mountRef.current || !window.paypal) return;
+        mountRef.current.innerHTML = "";
 
         window.paypal.Buttons({
             createOrder: async () => {
                 try {
-                    const r = await fetch("/api/create-order", {
+                    const r = await fetch("/.netlify/functions/create-order", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ pack }),
                     });
                     const j = await r.json();
-                    if (!r.ok || !j.id) {
-                        throw new Error(`create-order failed ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);
-                    }
+                    if (!r.ok || !j.id) throw new Error(`create-order ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);
                     return j.id;
                 } catch (err: any) {
                     onError(err?.message || "Could not create PayPal order");
@@ -80,26 +76,22 @@ export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
 
             onApprove: async (data: any) => {
                 try {
-                    const cap = await fetch("/api/capture-order", {
+                    const cap = await fetch("/.netlify/functions/capture-order", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ orderID: data.orderID }),
                     });
                     const details = await cap.json();
-                    if (!cap.ok) {
-                        throw new Error(`capture-order failed ${cap.status}: ${JSON.stringify(details).slice(0, 200)}`);
-                    }
+                    if (!cap.ok) throw new Error(`capture-order ${cap.status}: ${JSON.stringify(details).slice(0, 200)}`);
 
-                    // now verify + add credits in your backend
-                    const vr = await fetch("/api/verify-paypal", {
+                    const vr = await fetch("/.netlify/functions/verify-paypal", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ orderID: data.orderID, email, pack }),
                     });
                     const vj = await vr.json();
-                    if (!vr.ok || !vj?.ok) {
-                        throw new Error(`verify-paypal failed ${vr.status}: ${JSON.stringify(vj).slice(0, 200)}`);
-                    }
+                    if (!vr.ok || !vj?.ok) throw new Error(`verify-paypal ${vr.status}: ${JSON.stringify(vj).slice(0, 200)}`);
+
                     onSuccess(vj.credits);
                 } catch (err: any) {
                     onError(err?.message || "Payment capture/verification failed");
@@ -112,15 +104,9 @@ export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
                 console.error("PayPal Buttons error:", err);
                 onError("PayPal experienced an error. Try again.");
             },
-        }).render(ref.current);
+        }).render(mountRef.current);
     }, [ready, email, pack, onSuccess, onError]);
 
-    if (!ready) {
-        return (
-            <div className="text-center p-2 border rounded opacity-80">
-                Initializing PayPal…
-            </div>
-        );
-    }
-    return <div ref={ref} />;
+    if (!ready) return <div className="text-center p-2 border rounded opacity-80">Initializing PayPal…</div>;
+    return <div ref={mountRef} />;
 }
