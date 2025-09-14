@@ -104,12 +104,13 @@ export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
 
         const instance = window.paypal.Buttons({
             // onClick runs before createOrder - good place to block duplicates
-            onClick: () => {
+            onClick: (_data: any, actions: any) => {
+                // block double-submits while a flow is in progress
                 if (busyRef.current) {
-                    return window.paypal.Actions.reject();
+                    return actions.reject();
                 }
                 busyRef.current = true;
-                return window.paypal.Actions.resolve();
+                return actions.resolve();
             },
 
             createOrder: async () => {
