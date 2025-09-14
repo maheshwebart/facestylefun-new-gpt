@@ -1,23 +1,43 @@
-import { PAYPAL_API, getAccessToken } from "./_paypal.js";
+// netlify/functions/create-order.js
+import { getAccessToken, PAYPAL_API } from "./_paypal.js";
 
-export default async () => {
-  const accessToken = await getAccessToken();
+export async function handler(event) {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method Not Allowed" };
+  }
 
-  const res = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      intent: "CAPTURE",
-      purchase_units: [{ amount: { currency_code: "USD", value: "5.00" } }],
-    }),
-  });
+  try {
+    const { pack } = JSON.parse(event.body || "{}");
+    const amount = pack === "20" ? "9.00" : "3.00"; // keep in sync with verify-paypal
+    const label = pack === "20" ? "20 credits" : "5 credits";
 
-  const json = await res.json();
-  return new Response(JSON.stringify({ id: json.id }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
-};
+    const access = await getAccessToken();
+
+    const r = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${access}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [
+          {
+            description: label,
+            amount: { currency_code: "USD", value: amount },
+            custom_id: `pack_${pack}`,
+          },
+        ],
+        application_context: { shipping_preference: "NO_SHIPPING" },
+      }),
+    });
+
+    const j = await r.json();
+    if (!r.ok) {
+      return { statusCode: r.status, body: JSON.stringify(j) };
+    }
+    return { statusCode: 200, body: JSON.stringify({ id: j.id }) };
+  } catch (err) {
+    return { statusCode: 500, body: String(err?.message || err) };
+  }
+}
