@@ -1,24 +1,78 @@
-import React, { useState, FormEvent } from "react";
+import React, { useRef } from "react";
+import type { ImageData } from "../types";
 
-export default function PromptBar({ onSubmit }: { onSubmit: (prompt: string) => void }) {
-    const [prompt, setPrompt] = useState("");
+type Props = {
+    value: string;
+    onChange: (v: string) => void;
+    reference: ImageData | null;
+    onAttach: (img: ImageData | null) => void;
+    onSubmit: () => void;
+    disabled?: boolean;
+};
 
-    const handle = (e: FormEvent) => {
-        e.preventDefault();
-        onSubmit(prompt.trim());
-    };
+export default function PromptBar({
+    value, onChange, reference, onAttach, onSubmit, disabled
+}: Props) {
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        const base64 = await fileToB64(f);
+        onAttach({ base64, mimeType: f.type });
+        if (fileRef.current) fileRef.current.value = "";
+    }
 
     return (
-        <form onSubmit={handle} style={{ display: "flex", gap: 8 }}>
-            <input
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe the style: e.g., 'Long wavy hairstyle with short beard and thin metal glasses'"
-                style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: "1px solid #304050" }}
-            />
-            <button type="submit" style={{ padding: "10px 14px", borderRadius: 8, border: "1px solid #304050", cursor: "pointer" }}>
-                Apply Style
+        <div className={`promptBar ${disabled ? "isDisabled" : ""}`}>
+            <button
+                className="iconBtn"
+                title="Attach reference photo"
+                aria-label="Attach reference photo"
+                onClick={() => fileRef.current?.click()}
+                disabled={disabled}
+                type="button"
+            >
+                ↑
             </button>
-        </form>
+
+            <input
+                className="promptInput"
+                placeholder="Type your style request… (attach a reference ↑)"
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                disabled={disabled}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        onSubmit();
+                    }
+                }}
+            />
+
+            <button className="sendBtn" onClick={onSubmit} disabled={disabled} type="button">
+                Apply
+            </button>
+
+            <input ref={fileRef} type="file" accept="image/*" hidden onChange={onPickFile} />
+
+            {reference && (
+                <div className="attachChip" title="Reference attached">
+                    <img src={`data:${reference.mimeType};base64,${reference.base64}`} alt="reference preview" />
+                    <button className="chipX" onClick={() => onAttach(null)} type="button" aria-label="Remove reference" title="Remove">
+                        ×
+                    </button>
+                </div>
+            )}
+        </div>
     );
+}
+
+async function fileToB64(file: File): Promise<string> {
+    const reader = new FileReader();
+    return await new Promise((res, rej) => {
+        reader.onloadend = () => res(String(reader.result).split(",")[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+    });
 }

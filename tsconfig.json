@@ -1,23 +1,24 @@
 {
-    "compilerOptions": {
-        "target": "ES2020",
-        "module": "ESNext",
-        "jsx": "react-jsx",
-        "moduleResolution": "Bundler",
-        "strict": true,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": true,
-        "baseUrl": ".",
-        "types": [
-            "vite/client"
-        ]
-    },
-    "include": [
-        "src"
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
     ],
-    "exclude": [
-        "node_modules",
-        "dist"
-    ]
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "allowJs": false,
+    "strict": true,
+    "baseUrl": "."
+  },
+  "include": [
+    "src"
+  ]
 }
