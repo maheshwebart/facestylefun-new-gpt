@@ -1,6 +1,6 @@
 import React from 'react';
 import HairStyleOption from './HairStyleOption';
-import type { Style } from '../../types';
+import type { Style } from '../src/types';
 
 interface StyleSelectorProps {
   title: string;

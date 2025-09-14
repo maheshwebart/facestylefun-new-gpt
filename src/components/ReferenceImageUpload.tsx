@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ImageData } from '../../types';
+import type { ImageData } from '../src/types';
 
 interface ReferenceImageUploadProps {
     referenceImage: ImageData | null;

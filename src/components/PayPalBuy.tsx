@@ -1,42 +1,39 @@
-import React from "react";
-import { PayPalButtons } from "@paypal/react-paypal-js";
+import React, { useCallback } from "react";
+import { PayPalButtons, FUNDING, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 
-type Props = {
-    email: string;
-    pack: "5" | "20";
-    onSuccess: (newCredits: number) => void;
-    onError: (message: string) => void;
-};
+export default function PayPalBuy({ amount, description }: { amount: string; description?: string }) {
+    const [{ isPending }] = usePayPalScriptReducer();
 
-export default function PayPalBuy({ email, pack, onSuccess, onError }: Props) {
+    const createOrder = useCallback(async (): Promise<string> => {
+        const res = await fetch("/.netlify/functions/create-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount, description })
+        });
+        if (!res.ok) throw new Error(`Create order failed: ${res.status}`);
+        const { id } = await res.json();
+        return id;
+    }, [amount, description]);
+
+    const onApprove = useCallback(async (data: any) => {
+        const res = await fetch("/.netlify/functions/capture-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderID: data.orderID })
+        });
+        if (!res.ok) throw new Error(`Capture failed: ${res.status}`);
+        alert("Payment successful!");
+    }, []);
+
     return (
-        <PayPalButtons
-            style={{ layout: "vertical" }}
-            createOrder={async () => {
-                const res = await fetch("/.netlify/functions/create-order", { method: "POST" });
-                if (!res.ok) throw new Error("Failed to create order");
-                const { id } = await res.json();
-                return id;
-            }}
-            onApprove={async (data) => {
-                const res = await fetch("/.netlify/functions/capture-order", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ orderID: data.orderID, email, pack }),
-                });
-                if (!res.ok) {
-                    const t = await res.text();
-                    onError(t || "Payment capture failed");
-                    return;
-                }
-                const { creditsAdded, credits } = await res.json();
-                // Prefer the server's new total; fallback to add pack locally if missing
-                onSuccess(typeof credits === "number" ? credits : creditsAdded);
-            }}
-            onError={(err) => {
-                console.error(err);
-                onError("Payment failed. Please try again.");
-            }}
-        />
+        <div className="paypal">
+            {isPending && <div>Loading payment…</div>}
+            <PayPalButtons
+                style={{ layout: "vertical", shape: "rect", label: "pay" }}
+                fundingSource={FUNDING.PAYPAL}
+                createOrder={createOrder}
+                onApprove={onApprove}
+            />
+        </div>
     );
 }

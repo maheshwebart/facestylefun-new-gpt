@@ -1,31 +1,29 @@
 import type { Handler } from "@netlify/functions";
-import Razorpay from "razorpay";
-
-const key_id = process.env.RAZORPAY_KEY_ID!;
-const key_secret = process.env.RAZORPAY_KEY_SECRET!;
-
-const razorpay = new Razorpay({ key_id, key_secret });
 
 export const handler: Handler = async (event) => {
     try {
-        // Parse amount/metadata from client if you want dynamic plans
-        const { amount = 19900, currency = "INR", receipt = `rcpt_${Date.now()}` } =
-            event.body ? JSON.parse(event.body) : {};
+        const { amount = "5.00", description = "Credit pack" } = JSON.parse(event.body || "{}");
 
-        // amount in paise: ₹199.00 -> 19900
-        const order = await razorpay.orders.create({
-            amount,
-            currency,
-            receipt,
-            notes: { plan: "20_credits" },
+        const res = await fetch("https://api-m.paypal.com/v2/checkout/orders", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization:
+                    "Basic " + Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_SECRET}`).toString("base64"),
+            },
+            body: JSON.stringify({
+                intent: "CAPTURE",
+                purchase_units: [{ amount: { currency_code: "USD", value: amount }, description }]
+            })
         });
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ id: `ORDER-${Date.now()}` }),
-        };
+        if (!res.ok) {
+            const txt = await res.text();
+            return { statusCode: 500, body: JSON.stringify({ error: "PayPal create failed", detail: txt }) };
+        }
+        const data = await res.json();
+        return { statusCode: 200, body: JSON.stringify({ id: data.id }) };
     } catch (e: any) {
-        console.error(e);
-        return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+        return { statusCode: 500, body: JSON.stringify({ error: e?.message ?? "Server error" }) };
     }
 };

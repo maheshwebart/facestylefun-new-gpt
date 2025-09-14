@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Style } from '../../types';
+import type { Style } from '../src/types';
 
 interface StyleOptionProps {
   styleInfo: Style<string>;
