@@ -1,20 +1,23 @@
 // netlify/functions/create-order.js
 import { getAccessToken, PAYPAL_API } from "./_paypal.js";
 
-export default async (req) => {
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
+export async function handler(event) {
+  if (event.httpMethod !== "POST") {
+    return { statusCode: 405, body: "Method Not Allowed" };
+  }
 
   try {
-    const { pack } = await req.json();
+    const { pack } = JSON.parse(event.body || "{}");
     const amount = pack === "20" ? "9.00" : "3.00";
     const label = pack === "20" ? "20 credits" : "5 credits";
 
-    const token = await getAccessToken();
+    const access = await getAccessToken();
+
     const r = await fetch(`${PAYPAL_API}/v2/checkout/orders`, {
       method: "POST",
       headers: {
+        Authorization: `Bearer ${access}`,
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         intent: "CAPTURE",
@@ -30,12 +33,20 @@ export default async (req) => {
     });
 
     const j = await r.json();
-    if (!r.ok) return new Response(JSON.stringify(j), { status: r.status });
-    return new Response(JSON.stringify({ id: j.id }), {
-      status: 200,
+    if (!r.ok) {
+      return {
+        statusCode: r.status,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(j),
+      };
+    }
+
+    return {
+      statusCode: 200,
       headers: { "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    return new Response(e?.message || "Server error", { status: 500 });
+      body: JSON.stringify({ id: j.id }),
+    };
+  } catch (err) {
+    return { statusCode: 500, body: String(err?.message || err) };
   }
-};
+}
