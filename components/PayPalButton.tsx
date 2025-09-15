@@ -1,4 +1,3 @@
-
 import React from 'react';
 // Fix: OnApproveData and CreateOrderData are not exported from '@paypal/react-paypal-js'.
 // They have been removed from the import statement.
@@ -7,12 +6,13 @@ import { PayPalButtons } from '@paypal/react-paypal-js';
 interface PayPalButtonProps {
   amount: string;
   description: string;
+  currency: string;
   onSuccess: (details: any) => void;
   onError: (error: string) => void;
   disabled: boolean;
 }
 
-const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSuccess, onError, disabled }) => {
+const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, currency, onSuccess, onError, disabled }) => {
 
   // Fix: Replaced the non-exported type `CreateOrderData` with `Record<string, unknown>`.
   const createOrder = (data: Record<string, unknown>, actions: any) => {
@@ -22,7 +22,7 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
           description: description,
           amount: {
             value: amount,
-            currency_code: 'USD',
+            currency_code: currency,
           },
         }],
         application_context: {
@@ -55,13 +55,13 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
 
   return (
     <div className={`transition-opacity duration-300 ${disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-        <PayPalButtons
-            style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
-            createOrder={createOrder}
-            onApprove={onApprove}
-            onError={catchError}
-            forceReRender={[amount, description]} // Re-render the button if the amount or description changes
-        />
+      <PayPalButtons
+        style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
+        createOrder={createOrder}
+        onApprove={onApprove}
+        onError={catchError}
+        forceReRender={[amount, description, currency]} // Re-render the button if the amount or description changes
+      />
     </div>
   );
 };
