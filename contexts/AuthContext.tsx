@@ -29,24 +29,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (!supabase) {
-      setLoading(false);
-      return;
+        setLoading(false);
+        return;
     }
-
+    
     // The onAuthStateChange listener is called once on attachment, handling the initial session check.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
         setSession(session);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
-
+        
         if (currentUser) {
           await fetchProfile(currentUser.id);
         } else {
           setProfile(null);
         }
       } catch (e) {
-        console.error("Error in onAuthStateChange handler:", e);
+          console.error("Error in onAuthStateChange handler:", e);
       } finally {
         setLoading(false); // Ensure loading is false after initial check and any auth changes.
       }
@@ -65,7 +65,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .select('*')
         .eq('id', userId)
         .single();
-
+      
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         throw error;
       }
@@ -74,15 +74,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Error fetching profile:', error);
     }
   };
-
+  
   const refreshProfile = async () => {
     if (user && supabase) {
-      setLoading(true);
-      try {
-        await fetchProfile(user.id);
-      } finally {
-        setLoading(false);
-      }
+        setLoading(true);
+        try {
+          await fetchProfile(user.id);
+        } finally {
+          setLoading(false);
+        }
     }
   };
 
@@ -92,10 +92,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setError(error);
-        console.error('Sign in error:', error);
+          setError(error);
+          console.error('Sign in error:', error);
       } else {
-        setError(null);
+          setError(null);
       }
       return { error };
     } catch (e) {
@@ -112,15 +112,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!supabase) return { user: null, error: null };
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({ 
         email,
         password
       });
       if (error) {
-        setError(error);
-        console.error('Sign up error:', error);
+          setError(error);
+          console.error('Sign up error:', error);
       } else {
-        setError(null);
+          setError(null);
       }
       return { user: data.user, error };
     } catch (e) {
@@ -141,24 +141,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setProfile(null);
     // Loading state will be set to false by the onAuthStateChange listener
   };
-
+  
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!supabase || !user) return;
-
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (data) setProfile(data);
-    } finally {
-      setLoading(false);
-    }
+      if (!supabase || !user) {
+        throw new Error("Authentication error: Cannot update profile. User is not logged in.");
+      }
+      
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', user.id)
+            .select()
+            .single();
+            
+        if (error) throw error;
+        if (data) setProfile(data);
+      } finally {
+          setLoading(false);
+      }
   };
 
   const value = {

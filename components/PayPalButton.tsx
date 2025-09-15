@@ -55,13 +55,13 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, curren
 
   return (
     <div className={`transition-opacity duration-300 ${disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-      <PayPalButtons
-        style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
-        createOrder={createOrder}
-        onApprove={onApprove}
-        onError={catchError}
-        forceReRender={[amount, description, currency]} // Re-render the button if the amount or description changes
-      />
+        <PayPalButtons
+            style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
+            createOrder={createOrder}
+            onApprove={onApprove}
+            onError={catchError}
+            forceReRender={[amount, description, currency]} // Re-render the button if the amount or description changes
+        />
     </div>
   );
 };

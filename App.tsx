@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { editImageWithGemini } from './services/geminiService';
 import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, HistoryItem, Gender } from './types';
@@ -74,13 +71,13 @@ const PRIVACY_POLICY = "Your privacy is important to us. When you upload an imag
 const TERMS_OF_SERVICE = "This service is provided for entertainment purposes. You are responsible for the images you upload and must have the necessary rights to use them. Do not upload content that is illegal, offensive, or infringes on the rights of others. We are not liable for any misuse of this service or for the content generated. The service is provided 'as is' without warranties of any kind. We reserve the right to change or discontinue the service at any time.";
 
 const CREDIT_TIERS = [
-  { credits: 10, price: '1.99', description: 'Starter Pack: 10 Credits', tag: null },
-  { credits: 60, price: '8.99', description: 'Value Pack: 60 Credits', tag: 'Most Popular' },
-  { credits: 200, price: '24.99', description: 'Pro Pack: 200 Credits', tag: 'Best Value' },
+  { credits: 10, price: '150', description: 'Starter Pack: 10 Credits', tag: null },
+  { credits: 60, price: '750', description: 'Value Pack: 60 Credits', tag: 'Most Popular' },
+  { credits: 200, price: '2100', description: 'Pro Pack: 200 Credits', tag: 'Best Value' },
 ];
 
 const PRO_TIER = {
-  price: '9.99',
+  price: '850',
   description: 'facestyle.fun Pro Subscription',
 };
 
@@ -184,12 +181,33 @@ const App: React.FC = () => {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-            const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
-            const ctx = canvas.getContext('2d'); if (!ctx) return reject(new Error('Could not get canvas context'));
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return reject(new Error('Could not get canvas context'));
+            }
             ctx.drawImage(img, 0, 0);
-            const fontSize = Math.max(16, Math.round(img.width / 55));
-            ctx.font = `bold ${fontSize}px 'Poppins', sans-serif`; ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
-            const padding = Math.round(img.width / 80); ctx.fillText('facestyle.fun', canvas.width - padding, canvas.height - padding);
+
+            // --- Enhanced Watermark Styling ---
+            const fontSize = Math.max(18, Math.round(img.width / 60));
+            ctx.font = `bold ${fontSize}px 'Poppins', sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'bottom';
+
+            // Shadow for better visibility against all backgrounds
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+            ctx.shadowBlur = 5;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            
+            // Text fill
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+
+            const padding = Math.round(img.width / 60);
+            ctx.fillText('facestyle.fun', canvas.width - padding, canvas.height - padding);
+
             resolve(canvas.toDataURL('image/png'));
         };
         img.onerror = (err) => reject(new Error('Failed to load image for watermarking'));
@@ -234,8 +252,11 @@ const App: React.FC = () => {
     setIsLoading(true); setError(null); setEditedImage(null);
     try {
       const resultBase64 = await editImageWithGemini(originalImage, fullPrompt, referenceImage);
-      const watermarkedImage = await addWatermark(`data:image/png;base64,${resultBase64}`);
-      setEditedImage(watermarkedImage);
+      
+      const generatedImageWithHeader = `data:image/png;base64,${resultBase64}`;
+      const finalImage = isProUser ? generatedImageWithHeader : await addWatermark(generatedImageWithHeader);
+
+      setEditedImage(finalImage);
 
       if (!isProUser) {
         const currentCredits = profile?.credits ?? guestCredits;
@@ -248,14 +269,14 @@ const App: React.FC = () => {
       }
       
       if (isProUser && user && supabase) {
-        const { data, error } = await supabase.from('creations').insert({ user_id: user.id, original_image_base64: originalImage.base64, original_image_mimetype: originalImage.mimeType, original_image_name: originalImage.name, edited_image_base64_url: watermarkedImage, prompt: fullPrompt }).select().single();
+        const { data, error } = await supabase.from('creations').insert({ user_id: user.id, original_image_base64: originalImage.base64, original_image_mimetype: originalImage.mimeType, original_image_name: originalImage.name, edited_image_base64_url: finalImage, prompt: fullPrompt }).select().single();
         if (error) throw error;
         if (data) {
             const newHistoryItem: HistoryItem = { id: data.id, originalImage: { base64: data.original_image_base64, mimeType: data.original_image_mimetype, name: data.original_image_name }, editedImage: data.edited_image_base64_url, prompt: data.prompt, timestamp: new Date(data.created_at).toLocaleString() };
             setCloudHistory(prev => [newHistoryItem, ...prev]);
         }
       } else {
-        const newHistoryItem: HistoryItem = { id: Date.now(), originalImage: originalImage, editedImage: watermarkedImage, prompt: fullPrompt, timestamp: new Date().toLocaleString() };
+        const newHistoryItem: HistoryItem = { id: Date.now(), originalImage: originalImage, editedImage: finalImage, prompt: fullPrompt, timestamp: new Date().toLocaleString() };
         setLocalHistory(prev => [newHistoryItem, ...prev]);
       }
 
@@ -322,58 +343,53 @@ const App: React.FC = () => {
         return;
     }
     const creditsToAdd = selectedTier.credits;
+    const currentCredits = profile?.credits ?? 0;
 
-    if (user && profile) {
-        try {
-            await updateProfile({ credits: profile.credits + creditsToAdd });
-            setPaymentStatus('success');
-        } catch (err) {
-            const errorMessage = err instanceof Error ? `Failed to update credits: ${err.message}` : 'An unknown error occurred while updating your profile.';
-            setError(errorMessage);
+    try {
+        await updateProfile({ credits: currentCredits + creditsToAdd });
+        setPaymentStatus('success');
+
+        setTimeout(() => {
+            setShowPurchaseModal(false);
+            setSelectedTier(CREDIT_TIERS[1]);
             setPaymentStatus('idle');
-            return;
-        }
-    } else {
-        setShowPurchaseModal(false);
-        setShowAuthModal(true);
-        setError("Please sign in to add credits to your account.");
-        return;
-    }
+            setError(null);
+            setPurchaseReason(null);
+        }, 2000);
 
-    setTimeout(() => {
-        setShowPurchaseModal(false);
-        setSelectedTier(CREDIT_TIERS[1]);
+    } catch (err) {
+        const transactionId = details?.orderID || details?.razorpay_payment_id || 'N/A';
+        const errorMessage = err instanceof Error 
+            ? `Error: ${err.message}`
+            : 'An unknown error occurred while updating your profile.';
+        
+        setError(`Payment may have succeeded, but we couldn't update your credits. Please contact support with Transaction ID: ${transactionId}. Details: ${errorMessage}`);
         setPaymentStatus('idle');
-        setError(null);
-        setPurchaseReason(null);
-    }, 2000);
-  }, [user, profile, updateProfile, selectedTier]);
+    }
+  }, [profile, updateProfile, selectedTier]);
   
   const handleProSubscriptionSuccess = useCallback(async (details?: any) => {
     setPaymentStatus('processing');
-    if (user && profile) {
-      try {
-        await updateProfile({ is_pro: true });
-        setPaymentStatus('success');
-      } catch (err) {
-        const errorMessage = err instanceof Error ? `Failed to activate Pro plan: ${err.message}` : 'An unknown error occurred while activating your Pro plan.';
-        setError(errorMessage);
+    try {
+      await updateProfile({ is_pro: true });
+      setPaymentStatus('success');
+      
+      setTimeout(() => {
+          setShowPurchaseModal(false);
+          setPaymentStatus('idle');
+          setError(null);
+          setPurchaseReason(null);
+      }, 2000);
+
+    } catch (err) {
+        const transactionId = details?.orderID || details?.razorpay_payment_id || 'N/A';
+        const errorMessage = err instanceof Error 
+            ? `Error: ${err.message}`
+            : 'An unknown error occurred while activating your Pro plan.';
+        setError(`Payment may have succeeded, but we couldn't update your Pro status. Please contact support with Transaction ID: ${transactionId}. Details: ${errorMessage}`);
         setPaymentStatus('idle');
-        return;
-      }
-    } else {
-      setShowPurchaseModal(false);
-      setShowAuthModal(true);
-      setError("Please sign in to activate your Pro subscription.");
-      return;
     }
-    setTimeout(() => {
-        setShowPurchaseModal(false);
-        setPaymentStatus('idle');
-        setError(null);
-        setPurchaseReason(null);
-    }, 2000);
-  }, [user, profile, updateProfile]);
+  }, [updateProfile]);
 
   const handleOpenPurchaseModal = (tab: 'credits' | 'pro' = 'credits') => {
     setPurchaseReason(null); setPurchaseModalTab(tab); setShowPurchaseModal(true); setPaymentStatus('idle'); setSelectedTier(CREDIT_TIERS[1]); setError(null);
@@ -420,9 +436,8 @@ const App: React.FC = () => {
   const hairStylesToShow = effectiveGender === 'male' ? MALE_HAIR_STYLES : FEMALE_HAIR_STYLES;
 
   const paypalOptions = {
-      // Fix: The PayPal script options expect "clientId" (camelCase), not "client-id" (kebab-case).
-      clientId: PAYPAL_CLIENT_ID || 'sb', // Use 'sb' as a fallback for the SDK to load in sandbox mode
-      currency: "USD",
+      clientId: PAYPAL_CLIENT_ID || 'sb',
+      currency: "INR",
       intent: "capture",
   };
 
@@ -497,17 +512,26 @@ const App: React.FC = () => {
                                       {CREDIT_TIERS.map(tier => (<div key={tier.credits} className="relative">
                                             <button onClick={() => setSelectedTier(tier)} className={`relative p-6 rounded-xl border-2 transition-all duration-200 w-full text-center ${selectedTier?.credits === tier.credits ? 'border-cyan-400 bg-cyan-900/50 glow-border' : 'border-gray-700 bg-gray-800 hover:border-gray-500'}`}>
                                                 {tier.tag && (<span className={`absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${tier.tag === 'Most Popular' ? 'bg-cyan-400 text-black' : 'bg-yellow-400 text-black'}`}>{tier.tag}</span>)}
-                                                <p className="text-2xl font-bold text-cyan-400">{tier.credits}</p><p className="text-slate-400 text-sm">Credits</p><p className="text-lg font-semibold mt-2">${tier.price}</p>
+                                                <p className="text-2xl font-bold text-cyan-400">{tier.credits}</p><p className="text-slate-400 text-sm">Credits</p><p className="text-lg font-semibold mt-2">₹{tier.price}</p>
                                             </button></div>))}
                                     </div>
-                                    <div className="w-full max-w-sm mt-6 mx-auto space-y-4">
-                                      {selectedTier && PAYPAL_CLIENT_ID && (
-                                        <PayPalButton amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
-                                      )}
-                                      {selectedTier && RAZORPAY_KEY_ID && (
-                                        <RazorpayButton amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handleRazorpayError} disabled={paymentStatus !== 'idle'} />
-                                      )}
-                                    </div>
+                                    {user && profile ? (
+                                      <div className="w-full max-w-sm mt-6 mx-auto space-y-4">
+                                        {selectedTier && PAYPAL_CLIENT_ID && (
+                                          <PayPalButton currency="INR" amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
+                                        )}
+                                        {selectedTier && RAZORPAY_KEY_ID && (
+                                          <RazorpayButton currency="INR" amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handleRazorpayError} disabled={paymentStatus !== 'idle'} />
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="mt-8 text-center p-4 bg-gray-800/80 rounded-lg border border-gray-700">
+                                        <p className="text-slate-300 mb-4">Please sign in to add credits to your account.</p>
+                                        <Button onClick={() => { handleClosePurchaseModal(); setShowAuthModal(true); }} variant="primary">
+                                          Login / Sign Up
+                                        </Button>
+                                      </div>
+                                    )}
                                 </div>
                                 <CouponRedeemer />
                             </div>)}
@@ -518,17 +542,26 @@ const App: React.FC = () => {
                                 <ul className="text-left space-y-2 my-4 text-slate-300">
                                     <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><b>Permanent Cloud History</b> (Never lose a creation)</li>
                                     <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>Unlimited AI Edits (No credit costs)</li>
-                                    <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><span className="text-slate-500">No Watermark (Coming Soon)</span></li>
+                                    <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><b>No Watermark</b> on Creations</li>
                                 </ul>
-                                <div className="w-full max-w-sm mt-4 space-y-4">
-                                  {PAYPAL_CLIENT_ID && (
-                                    <PayPalButton amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
-                                  )}
-                                  {RAZORPAY_KEY_ID && (
-                                      <RazorpayButton amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handleRazorpayError} disabled={paymentStatus !== 'idle'} />
-                                  )}
-                                  <p className="text-xs text-slate-500 mt-2">Billed monthly. Cancel anytime.</p>
-                                </div>
+                                {user && profile ? (
+                                  <div className="w-full max-w-sm mt-4 space-y-4">
+                                    {PAYPAL_CLIENT_ID && (
+                                      <PayPalButton currency="INR" amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
+                                    )}
+                                    {RAZORPAY_KEY_ID && (
+                                        <RazorpayButton currency="INR" amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handleRazorpayError} disabled={paymentStatus !== 'idle'} />
+                                    )}
+                                    <p className="text-xs text-slate-500 mt-2">Billed monthly. Cancel anytime.</p>
+                                  </div>
+                                ) : (
+                                  <div className="mt-4 text-center p-4 bg-gray-800/80 rounded-lg border border-gray-700 w-full">
+                                    <p className="text-slate-300 mb-4">Please sign in to go Pro.</p>
+                                    <Button onClick={() => { handleClosePurchaseModal(); setShowAuthModal(true); }} variant="primary">
+                                      Login / Sign Up
+                                    </Button>
+                                  </div>
+                                )}
                             </div>)}
                       </div>
                       {paymentStatus === 'processing' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><Spinner /><p className="text-lg animate-pulse text-cyan-300">Processing payment...</p></div>)}
