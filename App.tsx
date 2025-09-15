@@ -20,6 +20,8 @@ import GenderSelector from './components/GenderSelector';
 import { useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabaseClient';
 import CouponRedeemer from './components/CouponRedeemer';
+import { PAYPAL_CLIENT_ID } from './config';
+import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 
 import {
   ShortAndNeatIcon, ModernFadeIcon, LongAndWavyIcon, CurlyTopIcon, BaldFadeIcon, AfroIcon, SlickedBackIcon,
@@ -330,25 +332,24 @@ const App: React.FC = () => {
     await executeImageEdit(cost, fullPrompt);
   };
 
-  const onProcessingPayment = useCallback(() => setPaymentStatus('processing'), []);
-
   const handlePayPalError = useCallback((err: string) => {
     setError(`PayPal Error: ${err}`);
-    setPaymentStatus('idle'); // Reset to allow retry
+    setPaymentStatus('idle'); // Reset to allow retry and close modal
   }, []);
 
   const handlePaymentSuccess = useCallback(async (details?: any) => {
+    setPaymentStatus('processing');
     if (!selectedTier) {
       setError('No credit tier was selected. Please try again.');
       setPaymentStatus('idle');
       return;
     }
     const creditsToAdd = selectedTier.credits;
-    setPaymentStatus('success');
 
     if (user && profile) {
       try {
         await updateProfile({ credits: profile.credits + creditsToAdd });
+        setPaymentStatus('success');
       } catch (err) {
         const errorMessage = err instanceof Error ? `Failed to update credits: ${err.message}` : 'An unknown error occurred while updating your profile.';
         setError(errorMessage);
@@ -372,10 +373,11 @@ const App: React.FC = () => {
   }, [user, profile, updateProfile, selectedTier]);
 
   const handleProSubscriptionSuccess = useCallback(async (details?: any) => {
-    setPaymentStatus('success');
+    setPaymentStatus('processing');
     if (user && profile) {
       try {
         await updateProfile({ is_pro: true });
+        setPaymentStatus('success');
       } catch (err) {
         const errorMessage = err instanceof Error ? `Failed to activate Pro plan: ${err.message}` : 'An unknown error occurred while activating your Pro plan.';
         setError(errorMessage);
@@ -397,10 +399,10 @@ const App: React.FC = () => {
   }, [user, profile, updateProfile]);
 
   const handleOpenPurchaseModal = (tab: 'credits' | 'pro' = 'credits') => {
-    setPurchaseReason(null); setPurchaseModalTab(tab); setShowPurchaseModal(true); setPaymentStatus('idle'); setSelectedTier(CREDIT_TIERS[1]);
+    setPurchaseReason(null); setPurchaseModalTab(tab); setShowPurchaseModal(true); setPaymentStatus('idle'); setSelectedTier(CREDIT_TIERS[1]); setError(null);
   }
 
-  const handleClosePurchaseModal = () => { if (!isLoading && paymentStatus !== 'processing') { setShowPurchaseModal(false); setPurchaseReason(null); } };
+  const handleClosePurchaseModal = () => { if (paymentStatus !== 'processing') { setShowPurchaseModal(false); setPurchaseReason(null); } };
 
   const handleResetSelections = useCallback(() => {
     setEditedImage(null); setError(null); setReferenceImage(null); setSelectedHairId(null); setSelectedBeardId(null);
@@ -439,6 +441,12 @@ const App: React.FC = () => {
   }
   const historyToShow = isProUser ? cloudHistory : localHistory;
   const hairStylesToShow = effectiveGender === 'male' ? MALE_HAIR_STYLES : FEMALE_HAIR_STYLES;
+
+  const paypalOptions = {
+    "client-id": PAYPAL_CLIENT_ID || 'sb', // Use 'sb' as a fallback for the SDK to load in sandbox mode
+    currency: "USD",
+    intent: "capture",
+  };
 
   return (
     <div className="min-h-screen bg-black text-slate-200 font-sans flex flex-col">
@@ -493,51 +501,53 @@ const App: React.FC = () => {
       {showTermsModal && <TermsModal onAgree={handleTermsAgree} onCancel={() => setShowTermsModal(false)} />}
       {showPurchaseModal && (
         <Modal title={purchaseReason ? "Not Enough Credits" : "Get More From facestyle.fun"} onClose={handleClosePurchaseModal}>
-          <div className="text-center">
-            {purchaseReason && !error && (<div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-500/40 rounded-xl"><p className="font-semibold text-yellow-200">{purchaseReason}</p></div>)}
-            {error && (<div className="mb-6 p-4 bg-red-900/50 border border-red-500 text-red-300 rounded-lg text-center"><p>{error}</p></div>)}
-            <div className="flex justify-center border-b border-gray-700 mb-6">
-              <button onClick={() => setPurchaseModalTab('credits')} className={`px-6 py-3 font-semibold transition-colors ${purchaseModalTab === 'credits' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-white'}`}>Buy Credits</button>
-              <button onClick={() => setPurchaseModalTab('pro')} className={`px-6 py-3 font-semibold transition-colors ${purchaseModalTab === 'pro' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-slate-400 hover:text-white'}`}>Go Pro</button>
-            </div>
-            <div className="relative min-h-[400px]">
-              <div className={`transition-opacity duration-300 ${paymentStatus !== 'idle' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                {purchaseModalTab === 'credits' && (
-                  <div>
-                    <div className='flex flex-col gap-4 items-center'>
-                      <p className="text-slate-300 mb-4">Select a credit pack to continue creating your perfect look.</p>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
-                        {CREDIT_TIERS.map(tier => (<div key={tier.credits} className="relative">
-                          <button onClick={() => setSelectedTier(tier)} className={`relative p-6 rounded-xl border-2 transition-all duration-200 w-full text-center ${selectedTier?.credits === tier.credits ? 'border-cyan-400 bg-cyan-900/50 glow-border' : 'border-gray-700 bg-gray-800 hover:border-gray-500'}`}>
-                            {tier.tag && (<span className={`absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${tier.tag === 'Most Popular' ? 'bg-cyan-400 text-black' : 'bg-yellow-400 text-black'}`}>{tier.tag}</span>)}
-                            <p className="text-2xl font-bold text-cyan-400">{tier.credits}</p><p className="text-slate-400 text-sm">Credits</p><p className="text-lg font-semibold mt-2">${tier.price}</p>
-                          </button></div>))}
-                      </div>
-                      {selectedTier && (<div className="w-full max-w-sm mt-6 mx-auto">
-                        <PayPalButton key={`${selectedTier.price}-${selectedTier.description}`} amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handlePayPalError} onProcessing={onProcessingPayment} />
-                      </div>)}
-                    </div>
-                    <CouponRedeemer />
-                  </div>)}
-                {purchaseModalTab === 'pro' && (
-                  <div className="flex flex-col items-center gap-4 p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
-                    <h3 className="text-2xl font-bold text-yellow-300">facestyle.fun PRO</h3>
-                    <p className="text-slate-300">Unlock the ultimate creative experience.</p>
-                    <ul className="text-left space-y-2 my-4 text-slate-300">
-                      <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><b>Permanent Cloud History</b> (Never lose a creation)</li>
-                      <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>Unlimited AI Edits (No credit costs)</li>
-                      <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><span className="text-slate-500">No Watermark (Coming Soon)</span></li>
-                    </ul>
-                    <div className="w-full max-w-sm mt-4">
-                      <PayPalButton key={PRO_TIER.price} amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} onProcessing={onProcessingPayment} />
-                      <p className="text-xs text-slate-500 mt-2">Billed monthly. Cancel anytime.</p>
-                    </div>
-                  </div>)}
+          <PayPalScriptProvider options={paypalOptions}>
+            <div className="text-center">
+              {purchaseReason && !error && (<div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-500/40 rounded-xl"><p className="font-semibold text-yellow-200">{purchaseReason}</p></div>)}
+              {error && (<div className="mb-6 p-4 bg-red-900/50 border border-red-500 text-red-300 rounded-lg text-center"><p>{error}</p></div>)}
+              <div className="flex justify-center border-b border-gray-700 mb-6">
+                <button onClick={() => setPurchaseModalTab('credits')} className={`px-6 py-3 font-semibold transition-colors ${purchaseModalTab === 'credits' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-slate-400 hover:text-white'}`}>Buy Credits</button>
+                <button onClick={() => setPurchaseModalTab('pro')} className={`px-6 py-3 font-semibold transition-colors ${purchaseModalTab === 'pro' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-slate-400 hover:text-white'}`}>Go Pro</button>
               </div>
-              {paymentStatus === 'processing' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><Spinner /><p className="text-lg animate-pulse text-cyan-300">Processing payment...</p></div>)}
-              {paymentStatus === 'success' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><p className="text-lg text-green-300">Purchase Successful!</p><p className="text-sm text-slate-400">Your account has been updated.</p></div>)}
+              <div className="relative min-h-[400px]">
+                <div className={`transition-opacity duration-300 ${paymentStatus !== 'idle' ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                  {purchaseModalTab === 'credits' && (
+                    <div>
+                      <div className='flex flex-col gap-4 items-center'>
+                        <p className="text-slate-300 mb-4">Select a credit pack to continue creating your perfect look.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+                          {CREDIT_TIERS.map(tier => (<div key={tier.credits} className="relative">
+                            <button onClick={() => setSelectedTier(tier)} className={`relative p-6 rounded-xl border-2 transition-all duration-200 w-full text-center ${selectedTier?.credits === tier.credits ? 'border-cyan-400 bg-cyan-900/50 glow-border' : 'border-gray-700 bg-gray-800 hover:border-gray-500'}`}>
+                              {tier.tag && (<span className={`absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${tier.tag === 'Most Popular' ? 'bg-cyan-400 text-black' : 'bg-yellow-400 text-black'}`}>{tier.tag}</span>)}
+                              <p className="text-2xl font-bold text-cyan-400">{tier.credits}</p><p className="text-slate-400 text-sm">Credits</p><p className="text-lg font-semibold mt-2">${tier.price}</p>
+                            </button></div>))}
+                        </div>
+                        {selectedTier && PAYPAL_CLIENT_ID && (<div className="w-full max-w-sm mt-6 mx-auto">
+                          <PayPalButton amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
+                        </div>)}
+                      </div>
+                      <CouponRedeemer />
+                    </div>)}
+                  {purchaseModalTab === 'pro' && (
+                    <div className="flex flex-col items-center gap-4 p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
+                      <h3 className="text-2xl font-bold text-yellow-300">facestyle.fun PRO</h3>
+                      <p className="text-slate-300">Unlock the ultimate creative experience.</p>
+                      <ul className="text-left space-y-2 my-4 text-slate-300">
+                        <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><b>Permanent Cloud History</b> (Never lose a creation)</li>
+                        <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>Unlimited AI Edits (No credit costs)</li>
+                        <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><span className="text-slate-500">No Watermark (Coming Soon)</span></li>
+                      </ul>
+                      {PAYPAL_CLIENT_ID && <div className="w-full max-w-sm mt-4">
+                        <PayPalButton amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
+                        <p className="text-xs text-slate-500 mt-2">Billed monthly. Cancel anytime.</p>
+                      </div>}
+                    </div>)}
+                </div>
+                {paymentStatus === 'processing' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><Spinner /><p className="text-lg animate-pulse text-cyan-300">Processing payment...</p></div>)}
+                {paymentStatus === 'success' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><p className="text-lg text-green-300">Purchase Successful!</p><p className="text-sm text-slate-400">Your account has been updated.</p></div>)}
+              </div>
             </div>
-          </div>
+          </PayPalScriptProvider>
         </Modal>
       )}
     </div>
