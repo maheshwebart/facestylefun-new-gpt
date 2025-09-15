@@ -11,7 +11,7 @@ interface PayPalButtonProps {
   amount: string;
   description: string;
   onSuccess: (details: any) => void;
-  onError: (error: any) => void;
+  onError: (error: string) => void;
   onProcessing: () => void;
 }
 
@@ -35,7 +35,7 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
     const script = document.createElement('script');
     script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
     script.async = true;
-    
+
     script.onload = () => {
       setSdkReady(true);
     };
@@ -52,7 +52,7 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
     if (sdkReady && paypalRef.current) {
       // Clear previous buttons before rendering new ones to avoid duplicates.
       paypalRef.current.innerHTML = '';
-      
+
       window.paypal.Buttons({
         createOrder: (data: any, actions: any) => {
           onProcessing();
@@ -92,8 +92,8 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
           console.error('PayPal SDK Error:', err);
         },
       }).render(paypalRef.current).catch((err: any) => {
-          console.error('Failed to render PayPal Buttons:', err);
-          setSdkError(true);
+        console.error('Failed to render PayPal Buttons:', err);
+        setSdkError(true);
       });
     }
   }, [sdkReady, amount, description, onSuccess, onError, onProcessing]);
