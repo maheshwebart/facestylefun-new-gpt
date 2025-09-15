@@ -1,5 +1,4 @@
 import React, { useState, useRef, useCallback } from 'react';
-import ImageDisplay from './ImageDisplay';
 
 interface ImageComparatorProps {
   before: string;
@@ -34,7 +33,12 @@ const ImageComparator: React.FC<ImageComparatorProps> = ({ before, after, isLoad
   };
 
   if (!after && !isLoading) {
-    return <ImageDisplay src={before} alt="Original" placeholderText="Your edited image will appear here after applying changes." />;
+    // Inlined logic from the old ImageDisplay component
+    return (
+      <div className="aspect-square w-full bg-gray-900/50 rounded-xl overflow-hidden shadow-lg border border-gray-700">
+        <img src={before} alt="Original" className="w-full h-full object-contain" />
+      </div>
+    );
   }
 
   return (

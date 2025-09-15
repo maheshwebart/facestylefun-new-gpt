@@ -1,5 +1,8 @@
+
 import React from 'react';
-import { PayPalButtons, OnApproveData, CreateOrderData } from '@paypal/react-paypal-js';
+// Fix: OnApproveData and CreateOrderData are not exported from '@paypal/react-paypal-js'.
+// They have been removed from the import statement.
+import { PayPalButtons } from '@paypal/react-paypal-js';
 
 interface PayPalButtonProps {
   amount: string;
@@ -11,7 +14,8 @@ interface PayPalButtonProps {
 
 const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSuccess, onError, disabled }) => {
 
-  const createOrder = (data: CreateOrderData, actions: any) => {
+  // Fix: Replaced the non-exported type `CreateOrderData` with `Record<string, unknown>`.
+  const createOrder = (data: Record<string, unknown>, actions: any) => {
     try {
       return actions.order.create({
         purchase_units: [{
@@ -32,7 +36,8 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
     }
   };
 
-  const onApprove = async (data: OnApproveData, actions: any) => {
+  // Fix: Replaced the non-exported type `OnApproveData` with `any`.
+  const onApprove = async (data: any, actions: any) => {
     try {
       const details = await actions.order.capture();
       onSuccess(details);
@@ -50,13 +55,13 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
 
   return (
     <div className={`transition-opacity duration-300 ${disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-      <PayPalButtons
-        style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
-        createOrder={createOrder}
-        onApprove={onApprove}
-        onError={catchError}
-        forceReRender={[amount, description]} // Re-render the button if the amount or description changes
-      />
+        <PayPalButtons
+            style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
+            createOrder={createOrder}
+            onApprove={onApprove}
+            onError={catchError}
+            forceReRender={[amount, description]} // Re-render the button if the amount or description changes
+        />
     </div>
   );
 };

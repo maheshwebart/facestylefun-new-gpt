@@ -12,10 +12,16 @@ const ShareIcon: React.FC = () => (
 
 
 const ShareButtons: React.FC<ShareButtonsProps> = ({ imageSrc }) => {
-  const dataURLtoFile = (dataurl: string, filename: string) => {
+  const dataURLtoFile = (dataurl: string, filename: string): File | null => {
     const arr = dataurl.split(',');
-    // @ts-ignore
-    const mime = arr[0].match(/:(.*?);/)[1];
+    const mimeMatch = arr[0].match(/:(.*?);/);
+
+    if (!mimeMatch || mimeMatch.length < 2 || !arr[1]) {
+      console.error("Invalid data URL for sharing");
+      return null;
+    }
+    
+    const mime = mimeMatch[1];
     const bstr = atob(arr[1]);
     let n = bstr.length;
     const u8arr = new Uint8Array(n);
@@ -31,11 +37,15 @@ const ShareButtons: React.FC<ShareButtonsProps> = ({ imageSrc }) => {
     if (navigator.share) {
       try {
         const file = dataURLtoFile(imageSrc, `facestyle.fun-${Date.now()}.png`);
-        await navigator.share({
-          title: 'Check out my new look!',
-          text: 'I used facestyle.fun to edit this photo. Try it out!',
-          files: [file],
-        });
+        if (file) {
+          await navigator.share({
+            title: 'Check out my new look!',
+            text: 'I used facestyle.fun to edit this photo. Try it out!',
+            files: [file],
+          });
+        } else {
+          throw new Error("Could not process image for sharing.");
+        }
       } catch (error) {
         console.error('Error sharing:', error);
         alert('Could not share the image. Please try downloading it first.');
