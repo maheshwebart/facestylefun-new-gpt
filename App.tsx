@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { editImageWithGemini } from './services/geminiService';
 import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, HistoryItem, Gender } from './types';
@@ -18,6 +19,7 @@ import HistoryPanel from './components/HistoryPanel';
 import AuthModal from './components/AuthModal';
 import TermsModal from './components/TermsModal';
 import GenderSelector from './components/GenderSelector';
+import ProfileModal from './components/ProfileModal';
 import { useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabaseClient';
 import CouponRedeemer from './components/CouponRedeemer';
@@ -71,18 +73,18 @@ const PRIVACY_POLICY = "Your privacy is important to us. When you upload an imag
 const TERMS_OF_SERVICE = "This service is provided for entertainment purposes. You are responsible for the images you upload and must have the necessary rights to use them. Do not upload content that is illegal, offensive, or infringes on the rights of others. We are not liable for any misuse of this service or for the content generated. The service is provided 'as is' without warranties of any kind. We reserve the right to change or discontinue the service at any time.";
 
 const CREDIT_TIERS = [
-  { credits: 10, price: '150', description: 'Starter Pack: 10 Credits', tag: null },
-  { credits: 60, price: '750', description: 'Value Pack: 60 Credits', tag: 'Most Popular' },
-  { credits: 200, price: '2100', description: 'Pro Pack: 200 Credits', tag: 'Best Value' },
+  { credits: 10, price: '1.99', description: 'Starter Pack: 10 Credits', tag: null },
+  { credits: 60, price: '8.99', description: 'Value Pack: 60 Credits', tag: 'Most Popular' },
+  { credits: 200, price: '24.99', description: 'Pro Pack: 200 Credits', tag: 'Best Value' },
 ];
 
 const PRO_TIER = {
-  price: '850',
+  price: '9.99',
   description: 'facestyle.fun Pro Subscription',
 };
 
 const App: React.FC = () => {
-  const { user, profile, updateProfile } = useAuth();
+  const { user, profile, updateProfile, loading: authLoading } = useAuth();
 
   const [originalImage, setOriginalImage] = useState<ImageData | null>(null);
   const [referenceImage, setReferenceImage] = useState<ImageData | null>(null);
@@ -117,8 +119,10 @@ const App: React.FC = () => {
   const [showPurchaseModal, setShowPurchaseModal] = useState<boolean>(false);
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [showTermsModal, setShowTermsModal] = useState<boolean>(false);
+  const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
   const [purchaseModalTab, setPurchaseModalTab] = useState<'credits' | 'pro'>('credits');
   const [purchaseReason, setPurchaseReason] = useState<string | null>(null);
+  const [postLoginAction, setPostLoginAction] = useState<'credits' | 'pro' | null>(null);
 
   const [selectedTier, setSelectedTier] = useState<typeof CREDIT_TIERS[number] | null>(CREDIT_TIERS[1]);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success'>('idle');
@@ -131,6 +135,18 @@ const App: React.FC = () => {
       localStorage.setItem('guestCredits', guestCredits.toString());
     }
   }, [guestCredits, user]);
+
+  useEffect(() => {
+    // When user logs in and there was a pending action, reopen the purchase modal
+    if (postLoginAction && user && !authLoading) {
+      setShowPurchaseModal(true);
+      setPurchaseModalTab(postLoginAction);
+      setPaymentStatus('idle');
+      setPurchaseReason(null);
+      setError(null);
+      setPostLoginAction(null); // Reset the action
+    }
+  }, [user, authLoading, postLoginAction]);
 
   useEffect(() => {
     if (!user) { // Only use local storage for history for guests
@@ -188,28 +204,28 @@ const App: React.FC = () => {
         if (!ctx) {
           return reject(new Error('Could not get canvas context'));
         }
+
         ctx.drawImage(img, 0, 0);
 
+        // Restored and improved watermark styling
         const fontSize = Math.max(18, Math.round(img.width / 60));
-        const padding = Math.round(fontSize * 1.2);
-
-        ctx.font = `bold ${fontSize}px 'Poppins', sans-serif`;
+        ctx.font = `600 ${fontSize}px 'Poppins', sans-serif`;
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'bottom';
 
-        // Shadow for better visibility
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        // Add a subtle shadow for better readability
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
         ctx.shadowBlur = 5;
         ctx.shadowOffsetX = 2;
         ctx.shadowOffsetY = 2;
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-
+        const padding = Math.round(img.width / 70);
         ctx.fillText('facestyle.fun', canvas.width - padding, canvas.height - padding);
 
         resolve(canvas.toDataURL('image/png'));
       };
-      img.onerror = (err) => reject(new Error('Failed to load image for watermarking'));
+      img.onerror = () => reject(new Error('Failed to load image for watermarking'));
       img.src = base64WithHeader;
     });
   };
@@ -232,6 +248,7 @@ const App: React.FC = () => {
       }
     };
     reader.onerror = () => setError(`Failed to read the ${type} image file.`);
+    // FIX: Corrected typo from readDataURL to readAsDataURL.
     reader.readAsDataURL(file);
   }
 
@@ -251,10 +268,8 @@ const App: React.FC = () => {
     setIsLoading(true); setError(null); setEditedImage(null);
     try {
       const resultBase64 = await editImageWithGemini(originalImage, fullPrompt, referenceImage);
-
-      const generatedImageWithHeader = `data:image/png;base64,${resultBase64}`;
-      const finalImage = isProUser ? generatedImageWithHeader : await addWatermark(generatedImageWithHeader);
-
+      const resultWithHeader = `data:image/png;base64,${resultBase64}`;
+      const finalImage = isProUser ? resultWithHeader : await addWatermark(resultWithHeader);
       setEditedImage(finalImage);
 
       if (!isProUser) {
@@ -336,62 +351,65 @@ const App: React.FC = () => {
 
   const handlePaymentSuccess = useCallback(async (details?: any) => {
     setPaymentStatus('processing');
-    if (!selectedTier) {
-      setError('No credit tier was selected. Please try again.');
+    if (!user || !profile || !selectedTier) {
+      setError('An unexpected error occurred. Please ensure you are logged in and have selected a tier.');
       setPaymentStatus('idle');
       return;
     }
     const creditsToAdd = selectedTier.credits;
-    const currentCredits = profile?.credits ?? 0;
-
     try {
-      await updateProfile({ credits: currentCredits + creditsToAdd });
+      await updateProfile({ credits: profile.credits + creditsToAdd });
       setPaymentStatus('success');
-
-      setTimeout(() => {
-        setShowPurchaseModal(false);
-        setSelectedTier(CREDIT_TIERS[1]);
-        setPaymentStatus('idle');
-        setError(null);
-        setPurchaseReason(null);
-      }, 2000);
-
     } catch (err) {
-      const transactionId = details?.orderID || details?.razorpay_payment_id || 'N/A';
-      const errorMessage = err instanceof Error
-        ? `Error: ${err.message}`
-        : 'An unknown error occurred while updating your profile.';
-
-      setError(`Payment may have succeeded, but we couldn't update your credits. Please contact support with Transaction ID: ${transactionId}. Details: ${errorMessage}`);
+      const errorMessage = err instanceof Error ? `Failed to update credits: ${err.message}` : 'An unknown error occurred while updating your profile.';
+      setError(errorMessage);
       setPaymentStatus('idle');
+      return;
     }
-  }, [profile, updateProfile, selectedTier]);
+
+    setTimeout(() => {
+      setShowPurchaseModal(false);
+      setSelectedTier(CREDIT_TIERS[1]);
+      setPaymentStatus('idle');
+      setError(null);
+      setPurchaseReason(null);
+    }, 2000);
+  }, [user, profile, updateProfile, selectedTier]);
 
   const handleProSubscriptionSuccess = useCallback(async (details?: any) => {
     setPaymentStatus('processing');
+    if (!user || !profile) {
+      setError("An unexpected error occurred. Please ensure you are logged in.");
+      setPaymentStatus('idle');
+      return;
+    }
+
     try {
       await updateProfile({ is_pro: true });
       setPaymentStatus('success');
-
-      setTimeout(() => {
-        setShowPurchaseModal(false);
-        setPaymentStatus('idle');
-        setError(null);
-        setPurchaseReason(null);
-      }, 2000);
-
     } catch (err) {
-      const transactionId = details?.orderID || details?.razorpay_payment_id || 'N/A';
-      const errorMessage = err instanceof Error
-        ? `Error: ${err.message}`
-        : 'An unknown error occurred while activating your Pro plan.';
-      setError(`Payment may have succeeded, but we couldn't update your Pro status. Please contact support with Transaction ID: ${transactionId}. Details: ${errorMessage}`);
+      const errorMessage = err instanceof Error ? `Failed to activate Pro plan: ${err.message}` : 'An unknown error occurred while activating your Pro plan.';
+      setError(errorMessage);
       setPaymentStatus('idle');
+      return;
     }
-  }, [updateProfile]);
+
+    setTimeout(() => {
+      setShowPurchaseModal(false);
+      setPaymentStatus('idle');
+      setError(null);
+      setPurchaseReason(null);
+    }, 2000);
+  }, [user, profile, updateProfile]);
 
   const handleOpenPurchaseModal = (tab: 'credits' | 'pro' = 'credits') => {
     setPurchaseReason(null); setPurchaseModalTab(tab); setShowPurchaseModal(true); setPaymentStatus('idle'); setSelectedTier(CREDIT_TIERS[1]); setError(null);
+  }
+
+  const handleAuthRequest = (action: 'credits' | 'pro') => {
+    setPostLoginAction(action);
+    setShowPurchaseModal(false);
+    setShowAuthModal(true);
   }
 
   const handleClosePurchaseModal = () => { if (paymentStatus !== 'processing') { setShowPurchaseModal(false); setPurchaseReason(null); } };
@@ -436,13 +454,18 @@ const App: React.FC = () => {
 
   const paypalOptions = {
     clientId: PAYPAL_CLIENT_ID || 'sb',
-    currency: "INR",
+    currency: "USD",
     intent: "capture",
   };
 
   return (
     <div className="min-h-screen bg-black text-slate-200 font-sans flex flex-col">
-      <Header onAuthClick={() => setShowAuthModal(true)} onBuyCreditsClick={() => handleOpenPurchaseModal('credits')} credits={currentCredits} />
+      <Header
+        onAuthClick={() => setShowAuthModal(true)}
+        onProfileClick={() => setShowProfileModal(true)}
+        onBuyCreditsClick={() => handleOpenPurchaseModal('credits')}
+        credits={currentCredits}
+      />
       <main className="flex-grow container mx-auto px-4 py-8">
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
         {!originalImage ? (
@@ -468,11 +491,6 @@ const App: React.FC = () => {
             <div className="lg:col-span-2 flex flex-col items-center justify-center gap-6">
               <div className="w-full max-w-3xl relative">
                 <ImageComparator before={originalImage ? `data:${originalImage.mimeType};base64,${originalImage.base64}` : ''} after={editedImage} isLoading={isLoading} />
-                {editedImage && !isProUser && (
-                  <div className="absolute bottom-4 right-4 text-xs font-bold text-white/70" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.7)' }}>
-                    facestyle.fun
-                  </div>
-                )}
                 {isLoading && (
                   <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center rounded-2xl z-20 backdrop-blur-sm">
                     <Spinner />
@@ -496,6 +514,19 @@ const App: React.FC = () => {
       {modalContent && <Modal title={modalContent.title} onClose={() => setModalContent(null)}><p className="text-sm text-slate-400 whitespace-pre-wrap">{modalContent.content}</p></Modal>}
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       {showTermsModal && <TermsModal onAgree={handleTermsAgree} onCancel={() => setShowTermsModal(false)} />}
+      {showProfileModal && (
+        <ProfileModal
+          onClose={() => setShowProfileModal(false)}
+          onGoProClick={() => {
+            setShowProfileModal(false);
+            handleOpenPurchaseModal('pro');
+          }}
+          onBuyCreditsClick={() => {
+            setShowProfileModal(false);
+            handleOpenPurchaseModal('credits');
+          }}
+        />
+      )}
       {showPurchaseModal && (
         <Modal title={purchaseReason ? "Not Enough Credits" : "Get More From facestyle.fun"} onClose={handleClosePurchaseModal}>
           <PayPalScriptProvider options={paypalOptions}>
@@ -516,26 +547,26 @@ const App: React.FC = () => {
                           {CREDIT_TIERS.map(tier => (<div key={tier.credits} className="relative">
                             <button onClick={() => setSelectedTier(tier)} className={`relative p-6 rounded-xl border-2 transition-all duration-200 w-full text-center ${selectedTier?.credits === tier.credits ? 'border-cyan-400 bg-cyan-900/50 glow-border' : 'border-gray-700 bg-gray-800 hover:border-gray-500'}`}>
                               {tier.tag && (<span className={`absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 text-xs font-semibold rounded-full whitespace-nowrap ${tier.tag === 'Most Popular' ? 'bg-cyan-400 text-black' : 'bg-yellow-400 text-black'}`}>{tier.tag}</span>)}
-                              <p className="text-2xl font-bold text-cyan-400">{tier.credits}</p><p className="text-slate-400 text-sm">Credits</p><p className="text-lg font-semibold mt-2">₹{tier.price}</p>
+                              <p className="text-2xl font-bold text-cyan-400">{tier.credits}</p><p className="text-slate-400 text-sm">Credits</p><p className="text-lg font-semibold mt-2">${tier.price}</p>
                             </button></div>))}
                         </div>
-                        {user && profile ? (
-                          <div className="w-full max-w-sm mt-6 mx-auto space-y-4">
-                            {selectedTier && PAYPAL_CLIENT_ID && (
-                              <PayPalButton currency="INR" amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
-                            )}
-                            {selectedTier && RAZORPAY_KEY_ID && (
-                              <RazorpayButton currency="INR" amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handleRazorpayError} disabled={paymentStatus !== 'idle'} />
-                            )}
-                          </div>
-                        ) : (
-                          <div className="mt-8 text-center p-4 bg-gray-800/80 rounded-lg border border-gray-700">
-                            <p className="text-slate-300 mb-4">Please sign in to add credits to your account.</p>
-                            <Button onClick={() => { handleClosePurchaseModal(); setShowAuthModal(true); }} variant="primary">
-                              Login / Sign Up
-                            </Button>
-                          </div>
-                        )}
+                        <div className="w-full max-w-sm mt-6 mx-auto space-y-4">
+                          {selectedTier && PAYPAL_CLIENT_ID && (
+                            <PayPalButton
+                              amount={selectedTier.price}
+                              description={selectedTier.description}
+                              onSuccess={handlePaymentSuccess} onError={handlePayPalError}
+                              disabled={paymentStatus !== 'idle'}
+                              onAuthRequest={() => handleAuthRequest('credits')} />
+                          )}
+                          {selectedTier && RAZORPAY_KEY_ID && (
+                            <RazorpayButton amount={selectedTier.price}
+                              description={selectedTier.description}
+                              onSuccess={handlePaymentSuccess} onError={handleRazorpayError}
+                              disabled={paymentStatus !== 'idle'}
+                              onAuthRequest={() => handleAuthRequest('credits')} />
+                          )}
+                        </div>
                       </div>
                       <CouponRedeemer />
                     </div>)}
@@ -544,28 +575,29 @@ const App: React.FC = () => {
                       <h3 className="text-2xl font-bold text-yellow-300">facestyle.fun PRO</h3>
                       <p className="text-slate-300">Unlock the ultimate creative experience.</p>
                       <ul className="text-left space-y-2 my-4 text-slate-300">
-                        <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><b>No Watermark</b> on Creations</li>
                         <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><b>Permanent Cloud History</b> (Never lose a creation)</li>
                         <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>Unlimited AI Edits (No credit costs)</li>
+                        <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>No Watermark</li>
                       </ul>
-                      {user && profile ? (
-                        <div className="w-full max-w-sm mt-4 space-y-4">
-                          {PAYPAL_CLIENT_ID && (
-                            <PayPalButton currency="INR" amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
-                          )}
-                          {RAZORPAY_KEY_ID && (
-                            <RazorpayButton currency="INR" amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handleRazorpayError} disabled={paymentStatus !== 'idle'} />
-                          )}
-                          <p className="text-xs text-slate-500 mt-2">Billed monthly. Cancel anytime.</p>
-                        </div>
-                      ) : (
-                        <div className="mt-4 text-center p-4 bg-gray-800/80 rounded-lg border border-gray-700 w-full">
-                          <p className="text-slate-300 mb-4">Please sign in to go Pro.</p>
-                          <Button onClick={() => { handleClosePurchaseModal(); setShowAuthModal(true); }} variant="primary">
-                            Login / Sign Up
-                          </Button>
-                        </div>
-                      )}
+                      <div className="w-full max-w-sm mt-4 space-y-4">
+                        {PAYPAL_CLIENT_ID && (
+                          <PayPalButton
+                            amount={PRO_TIER.price}
+                            description={PRO_TIER.description}
+                            onSuccess={handleProSubscriptionSuccess}
+                            onError={handlePayPalError} disabled={paymentStatus !== 'idle'}
+                            onAuthRequest={() => handleAuthRequest('pro')} />
+                        )}
+                        {RAZORPAY_KEY_ID && (
+                          <RazorpayButton
+                            amount={PRO_TIER.price}
+                            description={PRO_TIER.description}
+                            onSuccess={handleProSubscriptionSuccess}
+                            onError={handleRazorpayError} disabled={paymentStatus !== 'idle'}
+                            onAuthRequest={() => handleAuthRequest('pro')} />
+                        )}
+                        <p className="text-xs text-slate-500 mt-2">Billed monthly. Cancel anytime.</p>
+                      </div>
                     </div>)}
                 </div>
                 {paymentStatus === 'processing' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><Spinner /><p className="text-lg animate-pulse text-cyan-300">Processing payment...</p></div>)}
