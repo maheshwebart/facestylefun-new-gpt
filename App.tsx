@@ -106,6 +106,11 @@ const App: React.FC = () => {
   });
   const [cloudHistory, setCloudHistory] = useState<HistoryItem[]>([]);
 
+  // Centralized state for guest credits
+  const [guestCredits, setGuestCredits] = useState<number>(() => {
+    return parseInt(localStorage.getItem('guestCredits') || '3', 10);
+  });
+
   const isProUser = profile?.is_pro ?? false;
 
   const [showPurchaseModal, setShowPurchaseModal] = useState<boolean>(false);
@@ -119,20 +124,36 @@ const App: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Effect to persist guest credits to localStorage
   useEffect(() => {
-    if (!user) { // Only use local storage for guests
+    if (!user) { // Only manage localStorage for guests
+      localStorage.setItem('guestCredits', guestCredits.toString());
+    }
+  }, [guestCredits, user]);
+
+  useEffect(() => {
+    if (!user) { // Only use local storage for history for guests
       try {
         localStorage.setItem('userHistory', JSON.stringify(localHistory));
       } catch (e) {
         if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
           console.warn("LocalStorage quota exceeded. Removing oldest history item to make space.");
-          setLocalHistory(prev => prev.slice(0, prev.length - 1));
+          // Self-healing: remove the oldest item to make space
+          const trimmedHistory = localHistory.slice(0, localHistory.length - 1);
+          setLocalHistory(trimmedHistory);
+          // Retry saving immediately
+          try {
+            localStorage.setItem('userHistory', JSON.stringify(trimmedHistory));
+          } catch (retryError) {
+            console.error("Failed to save history to localStorage even after trimming:", retryError);
+          }
         } else {
           console.error("Failed to save history to localStorage:", e);
         }
       }
-    } else { // Clear local history on login
+    } else { // Clear local storage on login
       if (localStorage.getItem('userHistory')) localStorage.removeItem('userHistory');
+      if (localStorage.getItem('guestCredits')) localStorage.removeItem('guestCredits');
       if (localHistory.length > 0) setLocalHistory([]);
     }
   }, [localHistory, user]);
@@ -174,13 +195,10 @@ const App: React.FC = () => {
 
   const handleGenderDetection = async (image: ImageData) => {
     const cost = 1;
-    if (!isProUser) {
-      const guestCredits = parseInt(localStorage.getItem('guestCredits') || '3', 10);
-      const currentCredits = profile?.credits ?? guestCredits;
-      if (currentCredits < cost) {
-        setError(`You need 1 credit for AI Gender Detection. Please top up or select a gender manually.`);
-        return;
-      }
+    const currentCredits = profile?.credits ?? guestCredits;
+    if (!isProUser && currentCredits < cost) {
+      setError(`You need 1 credit for AI Gender Detection. Please top up or select a gender manually.`);
+      return;
     }
     setIsDetectingGender(true);
     setError(null);
@@ -188,13 +206,11 @@ const App: React.FC = () => {
       const result = await detectGenderWithGemini(image);
       setDetectedGender(result);
       if (!isProUser) {
-        const guestCredits = parseInt(localStorage.getItem('guestCredits') || '3', 10);
-        const currentCredits = profile?.credits ?? guestCredits;
         const newCredits = currentCredits - cost;
         if (user && profile) {
           await updateProfile({ credits: newCredits });
         } else {
-          localStorage.setItem('guestCredits', newCredits.toString());
+          setGuestCredits(newCredits);
         }
       }
     } catch (err) {
@@ -247,13 +263,12 @@ const App: React.FC = () => {
       setEditedImage(watermarkedImage);
 
       if (!isProUser) {
-        const guestCredits = parseInt(localStorage.getItem('guestCredits') || '3', 10);
         const currentCredits = profile?.credits ?? guestCredits;
         const newCredits = currentCredits - cost;
         if (user && profile) {
           await updateProfile({ credits: newCredits });
         } else {
-          localStorage.setItem('guestCredits', newCredits.toString());
+          setGuestCredits(newCredits);
         }
       }
 
@@ -266,7 +281,7 @@ const App: React.FC = () => {
         }
       } else {
         const newHistoryItem: HistoryItem = { id: Date.now(), originalImage: originalImage, editedImage: watermarkedImage, prompt: fullPrompt, timestamp: new Date().toLocaleString() };
-        setLocalHistory(prev => [newHistoryItem, ...prev].slice(0, 10));
+        setLocalHistory(prev => [newHistoryItem, ...prev]);
       }
 
     } catch (err) {
@@ -288,7 +303,6 @@ const App: React.FC = () => {
     if (gender === 'auto' && !detectedGender) { setError("Please wait for gender detection to complete, or select a gender manually."); return; }
 
     const cost = isProUser ? 0 : featureCount;
-    const guestCredits = parseInt(localStorage.getItem('guestCredits') || '3', 10);
     const currentCredits = profile?.credits ?? guestCredits;
 
     if (currentCredits < cost) {
@@ -323,7 +337,7 @@ const App: React.FC = () => {
     setPaymentStatus('idle'); // Reset to allow retry
   }, []);
 
-  const handlePaymentSuccess = useCallback(async () => {
+  const handlePaymentSuccess = useCallback(async (details?: any) => {
     if (!selectedTier) {
       setError('No credit tier was selected. Please try again.');
       setPaymentStatus('idle');
@@ -357,7 +371,7 @@ const App: React.FC = () => {
     }, 2000);
   }, [user, profile, updateProfile, selectedTier]);
 
-  const handleProSubscriptionSuccess = useCallback(async () => {
+  const handleProSubscriptionSuccess = useCallback(async (details?: any) => {
     setPaymentStatus('success');
     if (user && profile) {
       try {
@@ -414,6 +428,7 @@ const App: React.FC = () => {
     setSelectedBeardId(null); // Reset beard selection
   };
 
+  const currentCredits = profile?.credits ?? guestCredits;
   const hasSelection = Boolean(selectedHairId || selectedBeardId || selectedSunglassesId || referenceImage || selectedCorrectionId || customPrompt.trim());
   const showPrivacyPolicy = () => setModalContent({ title: 'Privacy Policy', content: PRIVACY_POLICY });
   const showTerms = () => setModalContent({ title: 'Terms of Service', content: TERMS_OF_SERVICE });
@@ -427,7 +442,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black text-slate-200 font-sans flex flex-col">
-      <Header onAuthClick={() => setShowAuthModal(true)} onBuyCreditsClick={() => handleOpenPurchaseModal('credits')} />
+      <Header onAuthClick={() => setShowAuthModal(true)} onBuyCreditsClick={() => handleOpenPurchaseModal('credits')} credits={currentCredits} />
       <main className="flex-grow container mx-auto px-4 py-8">
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleImageUpload} accept="image/*" />
         {!originalImage ? (
@@ -499,7 +514,7 @@ const App: React.FC = () => {
                           </button></div>))}
                       </div>
                       {selectedTier && (<div className="w-full max-w-sm mt-6 mx-auto">
-                        <PayPalButton amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handlePayPalError} onProcessing={onProcessingPayment} />
+                        <PayPalButton key={`${selectedTier.price}-${selectedTier.description}`} amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handlePayPalError} onProcessing={onProcessingPayment} />
                       </div>)}
                     </div>
                     <CouponRedeemer />
@@ -514,7 +529,7 @@ const App: React.FC = () => {
                       <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><span className="text-slate-500">No Watermark (Coming Soon)</span></li>
                     </ul>
                     <div className="w-full max-w-sm mt-4">
-                      <PayPalButton amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} onProcessing={onProcessingPayment} />
+                      <PayPalButton key={PRO_TIER.price} amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} onProcessing={onProcessingPayment} />
                       <p className="text-xs text-slate-500 mt-2">Billed monthly. Cancel anytime.</p>
                     </div>
                   </div>)}
