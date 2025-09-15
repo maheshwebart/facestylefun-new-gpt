@@ -19,12 +19,13 @@ const CouponRedeemer: React.FC = () => {
 
     const { data, error } = await supabase.rpc('redeem_coupon', {
       coupon_code: couponCode.trim(),
+      user_id: user.id,
     });
 
     setLoading(false);
 
     if (error) {
-      setMessage({ type: 'error', text: error.message || 'An unexpected server error occurred. Please try again.' });
+      setMessage({ type: 'error', text: 'An unexpected error occurred. Please try again.' });
       console.error('RPC Error:', error);
     } else if (data) {
       const responseText = data as string;
@@ -35,8 +36,6 @@ const CouponRedeemer: React.FC = () => {
       } else {
         setMessage({ type: 'error', text: responseText.replace('Error: ', '') });
       }
-    } else {
-      setMessage({ type: 'error', text: 'Received an empty response from the server. Please try again.' });
     }
   };
 
