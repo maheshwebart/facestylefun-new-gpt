@@ -1,14 +1,17 @@
 // This setup assumes that your build process (like Vite, used by Netlify)
-// will replace `process.env.VARIABLE_NAME` with the actual value at build time.
+// will replace `import.meta.env.VARIABLE_NAME` with the actual value at build time.
 
 // --- PayPal Configuration ---
-const PAYPAL_ENV = process.env.VITE_PAYPAL_ENV || 'sandbox';
-const PAYPAL_CLIENT_ID_LIVE = process.env.VITE_PAYPAL_CLIENT_ID_LIVE;
-const PAYPAL_CLIENT_ID_SANDBOX = process.env.VITE_PAYPAL_CLIENT_ID_SANDBOX;
+// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
+const PAYPAL_ENV = (import.meta as any).env.VITE_PAYPAL_ENV || 'sandbox';
+// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
+const PAYPAL_CLIENT_ID_LIVE = (import.meta as any).env.VITE_PAYPAL_CLIENT_ID_LIVE;
+// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
+const PAYPAL_CLIENT_ID_SANDBOX = (import.meta as any).env.VITE_PAYPAL_CLIENT_ID_SANDBOX;
 
-export const PAYPAL_CLIENT_ID = PAYPAL_ENV === 'live' 
-    ? PAYPAL_CLIENT_ID_LIVE 
-    : PAYPAL_CLIENT_ID_SANDBOX;
+export const PAYPAL_CLIENT_ID = PAYPAL_ENV === 'live'
+  ? PAYPAL_CLIENT_ID_LIVE
+  : PAYPAL_CLIENT_ID_SANDBOX;
 
 if (!PAYPAL_CLIENT_ID) {
   console.warn(
@@ -19,15 +22,17 @@ if (!PAYPAL_CLIENT_ID) {
 }
 
 // --- Supabase Configuration ---
-export const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-export const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY;
+// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
+export const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
+// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
+export const SUPABASE_ANON_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseconfigured = SUPABASE_URL && SUPABASE_ANON_KEY;
 
 if (!isSupabaseconfigured) {
-    console.warn(
-        "Supabase is not configured. " +
-        "Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY " +
-        "in your Netlify environment variables to enable user accounts and persistent data."
-    );
+  console.warn(
+    "Supabase is not configured. " +
+    "Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY " +
+    "in your Netlify environment variables to enable user accounts and persistent data."
+  );
 }
