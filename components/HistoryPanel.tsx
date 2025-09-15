@@ -1,6 +1,7 @@
 import React from 'react';
 import Button from './Button';
-import type { HistoryItem } from '../src/types';
+import type { HistoryItem } from '../types';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HistoryPanelProps {
   history: HistoryItem[];
@@ -11,29 +12,37 @@ interface HistoryPanelProps {
 }
 
 const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, isProUser, onLoadItem, onClearHistory, onGoProClick }) => {
+  const { user } = useAuth();
+  
   return (
     <div className="w-full max-w-3xl mt-4 bg-gray-900/50 p-4 rounded-2xl border border-cyan-500/20">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-lg font-semibold text-cyan-400">Creation History</h3>
-        {history.length > 0 && (
+        {history.length > 0 && !isProUser && (
           <Button onClick={onClearHistory} variant="secondary" className="!px-3 !py-1.5 !text-xs">
-            Clear Local History
+            Clear Session History
           </Button>
         )}
       </div>
+      
+      {user && isProUser && (
+        <div className="text-center p-3 mb-3 bg-green-900/30 border border-green-500/30 rounded-lg">
+          <p className="text-sm text-green-200">PRO user: Your history is securely saved in the cloud.</p>
+        </div>
+      )}
 
-      {!isProUser && (
+      {!user && (
         <div className="text-center p-3 mb-3 bg-yellow-900/30 border border-yellow-500/30 rounded-lg">
-          <p className="text-sm text-yellow-200">This is temporary session history.</p>
+          <p className="text-sm text-yellow-200">This is temporary guest history and will be cleared.</p>
           <p className="text-xs text-yellow-400/80">
-            <button onClick={onGoProClick} className="font-bold underline hover:text-white transition-colors">Go PRO</button> to save your creations to the cloud forever!
+            <button onClick={onGoProClick} className="font-bold underline hover:text-white transition-colors">Sign in or Go PRO</button> to save your creations forever!
           </p>
         </div>
       )}
 
       {history.length === 0 ? (
         <div className="text-center py-6">
-          <p className="text-slate-500">You haven't created any images in this session.</p>
+          <p className="text-slate-500">You haven't created any images yet.</p>
           <p className="text-slate-600 text-sm">Your new creations will appear here.</p>
         </div>
       ) : (

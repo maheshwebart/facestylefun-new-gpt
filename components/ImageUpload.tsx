@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface ImageUploadProps {
-  onImageUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onUploadClick: () => void;
   error: string | null;
 }
 
@@ -12,20 +12,21 @@ const UploadIcon: React.FC = () => (
 );
 
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ onImageUpload, error }) => {
+const ImageUpload: React.FC<ImageUploadProps> = ({ onUploadClick, error }) => {
   return (
     <div className="max-w-3xl mx-auto mt-10">
-        <label
-            htmlFor="image-upload"
+        <div
+            onClick={onUploadClick}
             className="flex flex-col items-center justify-center w-full h-96 border-2 border-cyan-500/30 border-dashed rounded-2xl cursor-pointer bg-gray-900/50 hover:bg-gray-900 transition-all duration-300 hover:border-cyan-500/70"
+            role="button"
+            aria-label="Upload an image"
         >
             <div className="flex flex-col items-center justify-center pt-5 pb-6">
                 <UploadIcon />
                 <p className="mb-2 text-xl text-slate-400"><span className="font-semibold text-cyan-400">Click to upload</span> or drag and drop</p>
                 <p className="text-sm text-slate-500">PNG, JPG, WEBP (MAX. 10MB)</p>
             </div>
-            <input id="image-upload" type="file" className="hidden" onChange={onImageUpload} accept="image/*" />
-        </label>
+        </div>
         <p className="mt-4 text-center text-xs text-slate-500">
             For safety reasons, please do not upload images of children or individuals who appear to be under 18.
         </p>

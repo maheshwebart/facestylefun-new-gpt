@@ -73,6 +73,8 @@ export const SlickedBackIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) 
   </svg>
 );
 
+// --- FEMALE ICONS ---
+
 export const BobCutIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 15a6 6 0 0 0 12 0Z" />
@@ -97,6 +99,52 @@ export const LongStraightIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props)
     <path d="M16 4v16" />
     <path d="M8 4a4 4 0 0 1 8 0" />
   </svg>
+);
+
+export const PixieCutIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M15 5s-1-2-4-2-4 2-4 2" />
+        <path d="M17 7s-2-2-5-2-5 2-5 2" />
+        <path d="M19 9s-3-2-7-2-7 2-7 2" />
+        <path d="M10 12 c0 2 1 3 2 3s2-1 2-3" />
+    </svg>
+);
+
+export const ShagCutIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 8l2-4 2 4" />
+        <path d="M16 8l2-4 2 4" />
+        <path d="M6 14l2-4 2 4" />
+        <path d="M14 14l2-4 2 4" />
+        <path d="M8 20l2-4 2 4" />
+        <path d="M5 8c2-3 5-3 7 0s5 3 7 0" />
+    </svg>
+);
+
+export const BraidsIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 4s-2 2-2 6" />
+        <path d="M16 4s2 2 2 6" />
+        <path d="M6 10l2 2 2-2" />
+        <path d="M14 10l2 2 2-2" />
+        <path d="m8 12 2 2 2-2" />
+        <path d="m14 12 2 2 2-2" />
+        <path d="m6 14 2 2 2-2" />
+        <path d="m14 14 2 2 2-2" />
+        <path d="m8 16 2 2 2-2" />
+        <path d="m14 16 2 2 2-2" />
+    </svg>
+);
+
+export const UpdoIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 12a5 5 0 1 0-5-5" />
+        <path d="M12 12a5 5 0 0 0-5 5" />
+        <path d="M12 2a5 5 0 0 1 5 5" />
+        <path d="M7 7a5 5 0 0 0 5 5" />
+        <path d="M19 12a5 5 0 0 1-5 5" />
+        <path d="M12 17c-3 0-5 2-5 4h10c0-2-2-4-5-4z" />
+    </svg>
 );
 
 // --- Beard Icons ---
