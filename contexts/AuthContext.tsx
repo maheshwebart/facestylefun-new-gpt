@@ -27,36 +27,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (!supabase) {
-        setLoading(false);
-        return;
+      setLoading(false);
+      return;
     }
 
-    const getInitialSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-            await fetchProfile(session.user.id);
-        }
-        setLoading(false);
-    };
-
-    getInitialSession();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // The onAuthStateChange listener is called once on attachment, handling the initial session check.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
+
       if (currentUser) {
         await fetchProfile(currentUser.id);
       } else {
         setProfile(null);
       }
+      setLoading(false); // Ensure loading is false after initial check and any auth changes.
     });
 
     return () => {
-      authListener?.subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 
@@ -68,7 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .select('*')
         .eq('id', userId)
         .single();
-      
+
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         throw error;
       }
@@ -77,10 +67,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Error fetching profile:', error);
     }
   };
-  
+
   const refreshProfile = async () => {
     if (user) {
-        await fetchProfile(user.id);
+      await fetchProfile(user.id);
     }
   };
 
@@ -89,10 +79,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-        setError(error);
-        console.error('Sign in error:', error);
+      setError(error);
+      console.error('Sign in error:', error);
     } else {
-        setError(null);
+      setError(null);
     }
     setLoading(false);
     return { error };
@@ -101,15 +91,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = async (email: string, password: string) => {
     if (!supabase) return;
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({ 
+    const { data, error } = await supabase.auth.signUp({
       email,
       password
     });
     if (error) {
-        setError(error);
-        console.error('Sign up error:', error);
+      setError(error);
+      console.error('Sign up error:', error);
     } else {
-        setError(null);
+      setError(null);
     }
     setLoading(false);
     return { user: data.user, error };
@@ -121,21 +111,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
-    setLoading(false);
+    // Loading state will be set to false by the onAuthStateChange listener
   };
-  
+
   const updateProfile = async (updates: Partial<Profile>) => {
-      if (!supabase || !user) return;
-      
-      const { data, error } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', user.id)
-          .select()
-          .single();
-          
-      if (error) throw error;
-      if (data) setProfile(data);
+    if (!supabase || !user) return;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (data) setProfile(data);
   };
 
   const value = {
