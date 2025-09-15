@@ -21,6 +21,17 @@ if (!PAYPAL_CLIENT_ID) {
   );
 }
 
+// --- Razorpay Configuration ---
+// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
+export const RAZORPAY_KEY_ID = (import.meta as any).env.VITE_RAZORPAY_KEY_ID;
+
+if (!RAZORPAY_KEY_ID) {
+  console.warn(
+    "Razorpay payments are not configured. " +
+    "Please set VITE_RAZORPAY_KEY_ID in your environment variables to enable payments."
+  );
+}
+
 // --- Supabase Configuration ---
 // Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
 export const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;

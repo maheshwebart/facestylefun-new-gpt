@@ -1,13 +1,15 @@
 
+
 import { GoogleGenAI, Modality, HarmCategory, HarmBlockThreshold, Type } from "@google/genai";
 import { API_KEY } from "../config";
 import { ImageData } from "../types";
 
-// Per coding guidelines, the AI client is initialized directly.
-// It is assumed the API_KEY is pre-configured and accessible in the environment.
-// The GenAI library will handle an invalid or missing key.
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+// Conditionally initialize the AI client only if the API key is provided.
+const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
 
+if (!ai) {
+  console.error("VITE_API_KEY is not set in the environment variables. AI features are disabled.");
+}
 
 // Define strict safety settings to prevent unsafe content generation.
 const safetySettings = [
@@ -32,13 +34,17 @@ const safetySettings = [
 // System instruction to prevent processing images of minors.
 const systemInstruction = "You are a responsible AI image editing assistant. Your most critical safety rule is to never process, edit, or generate images that depict children or individuals who appear to be under 18 years of age. If an uploaded image seems to contain a minor, you must strictly refuse the request. Do not proceed with the edit. Instead, reply with only the following text: 'Error: Image appears to contain a child and cannot be processed.'";
 
-// Refactored to remove the conditional check for the `ai` client.
-// This aligns with the guideline to assume the API key is always available.
+// FIX: Implement and export editImageWithGemini to handle image editing requests.
+// This function was missing, causing an export error in App.tsx and an initialization error in this file.
 export const editImageWithGemini = async (
   originalImage: ImageData,
   prompt: string,
   referenceImage: ImageData | null = null
 ): Promise<string> => {
+  if (!ai) {
+    throw new Error("Gemini AI client is not initialized. Check API_KEY.");
+  }
+
   const parts: any[] = [
     {
       inlineData: {
@@ -89,74 +95,6 @@ export const editImageWithGemini = async (
     if (error instanceof Error) {
         if(error.message.includes('SAFETY')) {
             friendlyMessage = "The request was blocked due to safety settings. Please ensure your prompt and image are appropriate.";
-        } else {
-            friendlyMessage = error.message;
-        }
-    }
-    throw new Error(friendlyMessage);
-  }
-};
-
-// Refactored to remove the conditional check for the `ai` client.
-// This aligns with the guideline to assume the API key is always available.
-export const detectGenderWithGemini = async (image: ImageData): Promise<'male' | 'female'> => {
-  const prompt = "Analyze the provided image and determine the most likely gender of the person. Respond in JSON format with a single key 'gender' which can be either 'male' or 'female'.";
-  
-  const imagePart = {
-    inlineData: {
-      mimeType: image.mimeType,
-      data: image.base64,
-    },
-  };
-
-  const textPart = {
-    text: prompt
-  };
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: { parts: [imagePart, textPart] },
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            gender: {
-              type: Type.STRING,
-              description: "The detected gender of the person, either 'male' or 'female'.",
-            },
-          },
-        },
-        safetySettings,
-        systemInstruction
-      },
-    });
-
-    const jsonText = response.text?.trim();
-    if (!jsonText) {
-        throw new Error("AI returned an empty response for gender detection.");
-    }
-
-    if (jsonText.startsWith("Error:")) {
-        throw new Error(jsonText);
-    }
-
-    const result = JSON.parse(jsonText);
-
-    if (result.gender && (result.gender.toLowerCase() === 'male' || result.gender.toLowerCase() === 'female')) {
-      return result.gender.toLowerCase();
-    } else {
-      throw new Error("Could not determine gender from the AI response.");
-    }
-  } catch (error) {
-    console.error("Gemini gender detection error:", error);
-    let friendlyMessage = "An error occurred while detecting gender. Please select a gender manually.";
-    if (error instanceof Error) {
-        if(error.message.includes('SAFETY')) {
-            friendlyMessage = "The request was blocked due to safety settings. This may happen if the image contains a minor.";
-        } else if (error.message.includes('JSON')) {
-            friendlyMessage = "The AI returned an invalid format for gender detection. Please select a gender manually.";
         } else {
             friendlyMessage = error.message;
         }

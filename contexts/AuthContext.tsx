@@ -9,8 +9,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   error: AuthError | null;
-  signInWithPassword: (email: string) => Promise<any>;
-  signUp: (email: string) => Promise<any>;
+  signInWithPassword: (email: string, password: string) => Promise<any>;
+  signUp: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -84,29 +84,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signInWithPassword = async (email: string) => {
+  const signInWithPassword = async (email: string, password: string) => {
     if (!supabase) return;
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
         setError(error);
         console.error('Sign in error:', error);
+    } else {
+        setError(null);
     }
     setLoading(false);
     return { error };
   };
 
-  const signUp = async (email: string) => {
+  const signUp = async (email: string, password: string) => {
     if (!supabase) return;
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({ 
       email,
-      // A password is required but Supabase magic link makes it so user doesn't need to create one initially
-      password: Math.random().toString(36).slice(-8) 
+      password
     });
     if (error) {
         setError(error);
         console.error('Sign up error:', error);
+    } else {
+        setError(null);
     }
     setLoading(false);
     return { user: data.user, error };

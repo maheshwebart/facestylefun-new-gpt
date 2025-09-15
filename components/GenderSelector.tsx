@@ -5,12 +5,10 @@ interface GenderSelectorProps {
     selectedGender: Gender;
     onGenderChange: (gender: Gender) => void;
     disabled: boolean;
-    isDetecting: boolean;
 }
 
-const GenderSelector: React.FC<GenderSelectorProps> = ({ selectedGender, onGenderChange, disabled, isDetecting }) => {
+const GenderSelector: React.FC<GenderSelectorProps> = ({ selectedGender, onGenderChange, disabled }) => {
     const options: { id: Gender, label: string }[] = [
-        { id: 'auto', label: 'Auto-Detect' },
         { id: 'female', label: 'Female' },
         { id: 'male', label: 'Male' },
     ];
@@ -19,9 +17,6 @@ const GenderSelector: React.FC<GenderSelectorProps> = ({ selectedGender, onGende
         <div className="w-full">
             <h3 className="text-md font-semibold text-cyan-400 mb-3 flex items-center gap-2">
                 Subject Gender
-                {isDetecting && (
-                    <div className="w-4 h-4 border-2 border-t-transparent border-cyan-400 rounded-full animate-spin"></div>
-                )}
             </h3>
             <div className="flex items-center gap-2 bg-gray-800/60 border-2 border-gray-700 rounded-xl p-1">
                 {options.map(option => (

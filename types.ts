@@ -25,7 +25,7 @@ export interface Style<T extends string> {
 }
 
 // Gender
-export type Gender = 'male' | 'female' | 'auto';
+export type Gender = 'male' | 'female';
 
 // Hair Styles
 export type HairStyleId = 

@@ -1,7 +1,8 @@
 
 
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { editImageWithGemini, detectGenderWithGemini } from './services/geminiService';
+import { editImageWithGemini } from './services/geminiService';
 import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, HistoryItem, Gender } from './types';
 import Header from './components/Header';
 import ImageUpload from './components/ImageUpload';
@@ -14,6 +15,7 @@ import Footer from './components/Footer';
 import Modal from './components/Modal';
 import CustomPromptInput from './components/CustomPromptInput';
 import PayPalButton from './components/PayPalButton';
+import RazorpayButton from './components/RazorpayButton';
 import ShareButtons from './components/ShareButtons';
 import HistoryPanel from './components/HistoryPanel';
 import AuthModal from './components/AuthModal';
@@ -22,7 +24,7 @@ import GenderSelector from './components/GenderSelector';
 import { useAuth } from './contexts/AuthContext';
 import { supabase } from './services/supabaseClient';
 import CouponRedeemer from './components/CouponRedeemer';
-import { PAYPAL_CLIENT_ID } from './config';
+import { PAYPAL_CLIENT_ID, RAZORPAY_KEY_ID } from './config';
 import { PayPalScriptProvider } from '@paypal/react-paypal-js';
 
 import { 
@@ -89,7 +91,6 @@ const App: React.FC = () => {
   const [referenceImage, setReferenceImage] = useState<ImageData | null>(null);
   const [editedImage, setEditedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isDetectingGender, setIsDetectingGender] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [modalContent, setModalContent] = useState<{title: string, content: string} | null>(null);
   
@@ -99,9 +100,8 @@ const App: React.FC = () => {
   const [selectedCorrectionId, setSelectedCorrectionId] = useState<CorrectionStyleId | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('');
   
-  const [gender, setGender] = useState<Gender>('auto');
-  const [detectedGender, setDetectedGender] = useState<'male' | 'female' | null>(null);
-
+  const [gender, setGender] = useState<Gender>('female');
+  
   const [localHistory, setLocalHistory] = useState<HistoryItem[]>(() => {
     try {
       const savedHistory = localStorage.getItem('userHistory');
@@ -197,33 +197,6 @@ const App: React.FC = () => {
     });
   };
   
-  const handleGenderDetection = async (image: ImageData) => {
-      const cost = 1;
-      const currentCredits = profile?.credits ?? guestCredits;
-      if (!isProUser && currentCredits < cost) {
-          setError(`You need 1 credit for AI Gender Detection. Please top up or select a gender manually.`);
-          return;
-      }
-      setIsDetectingGender(true);
-      setError(null);
-      try {
-          const result = await detectGenderWithGemini(image);
-          setDetectedGender(result);
-          if (!isProUser) {
-            const newCredits = currentCredits - cost;
-            if (user && profile) {
-              await updateProfile({ credits: newCredits });
-            } else {
-              setGuestCredits(newCredits);
-            }
-          }
-      } catch (err) {
-          setError(err instanceof Error ? err.message : 'Unknown gender detection error.');
-      } finally {
-          setIsDetectingGender(false);
-      }
-  };
-
   const processImageFile = async (file: File, type: 'original' | 'reference') => {
       if (!file.type.startsWith('image/')) { setError('Please upload a valid image file (PNG, JPG, etc.).'); return; }
       const reader = new FileReader();
@@ -235,9 +208,7 @@ const App: React.FC = () => {
         if (type === 'original') {
             setOriginalImage(imageData);
             handleResetSelections();
-            setDetectedGender(null);
-            setGender('auto');
-            await handleGenderDetection(imageData);
+            setGender('female');
         } else {
             setReferenceImage(imageData);
             setSelectedHairId(null);
@@ -300,11 +271,10 @@ const App: React.FC = () => {
     return Math.max(1, count);
   }, [selectedHairId, selectedBeardId, selectedSunglassesId, referenceImage, selectedCorrectionId, customPrompt]);
 
-  const effectiveGender = gender === 'auto' ? detectedGender : gender;
+  const effectiveGender = gender;
 
   const handleApplyChanges = async () => {
     if (isLoading || !hasSelection) { if (!hasSelection) setError("Please select at least one style to apply."); return; }
-    if (gender === 'auto' && !detectedGender) { setError("Please wait for gender detection to complete, or select a gender manually."); return; }
     
     const cost = isProUser ? 0 : featureCount;
     const currentCredits = profile?.credits ?? guestCredits;
@@ -336,6 +306,11 @@ const App: React.FC = () => {
   
   const handlePayPalError = useCallback((err: string) => {
       setError(`PayPal Error: ${err}`);
+      setPaymentStatus('idle'); // Reset to allow retry and close modal
+  }, []);
+  
+  const handleRazorpayError = useCallback((err: string) => {
+      setError(`Razorpay Error: ${err}`);
       setPaymentStatus('idle'); // Reset to allow retry and close modal
   }, []);
 
@@ -467,7 +442,7 @@ const App: React.FC = () => {
                       <button onClick={() => handleOpenPurchaseModal('pro')} className="text-xs font-semibold bg-yellow-400/10 text-yellow-300 px-2 py-1 rounded-md border border-yellow-400/20 hover:bg-yellow-400/20 transition-colors">Go PRO</button>
                     )}
                 </div>
-                <GenderSelector selectedGender={gender} onGenderChange={handleGenderChange} disabled={isLoading} isDetecting={isDetectingGender} />
+                <GenderSelector selectedGender={gender} onGenderChange={handleGenderChange} disabled={isLoading} />
                 <HairStyleSelector title="Hairstyle" styles={hairStylesToShow} selectedStyleId={selectedHairId} onStyleSelect={(style) => onHairStyleSelect(style as HairStyle | null)} disabled={isLoading || !!referenceImage || !effectiveGender} />
                 <ReferenceImageUpload referenceImage={referenceImage} onImageUpload={(e) => e.target.files && processImageFile(e.target.files[0], 'reference')} onRemoveImage={() => setReferenceImage(null)} disabled={isLoading || !effectiveGender} />
                 {effectiveGender === 'male' && <HairStyleSelector title="Beard" styles={BEARD_STYLES} selectedStyleId={selectedBeardId} onStyleSelect={(style) => setSelectedBeardId(style ? style.id as BeardStyleId : null)} disabled={isLoading} />}
@@ -525,9 +500,14 @@ const App: React.FC = () => {
                                                 <p className="text-2xl font-bold text-cyan-400">{tier.credits}</p><p className="text-slate-400 text-sm">Credits</p><p className="text-lg font-semibold mt-2">${tier.price}</p>
                                             </button></div>))}
                                     </div>
-                                    {selectedTier && PAYPAL_CLIENT_ID && (<div className="w-full max-w-sm mt-6 mx-auto">
+                                    <div className="w-full max-w-sm mt-6 mx-auto space-y-4">
+                                      {selectedTier && PAYPAL_CLIENT_ID && (
                                         <PayPalButton amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
-                                    </div>)}
+                                      )}
+                                      {selectedTier && RAZORPAY_KEY_ID && (
+                                        <RazorpayButton amount={selectedTier.price} description={selectedTier.description} onSuccess={handlePaymentSuccess} onError={handleRazorpayError} disabled={paymentStatus !== 'idle'} />
+                                      )}
+                                    </div>
                                 </div>
                                 <CouponRedeemer />
                             </div>)}
@@ -540,10 +520,15 @@ const App: React.FC = () => {
                                     <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>Unlimited AI Edits (No credit costs)</li>
                                     <li className="flex items-center gap-3"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg><span className="text-slate-500">No Watermark (Coming Soon)</span></li>
                                 </ul>
-                                {PAYPAL_CLIENT_ID && <div className="w-full max-w-sm mt-4">
-                                  <PayPalButton amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
+                                <div className="w-full max-w-sm mt-4 space-y-4">
+                                  {PAYPAL_CLIENT_ID && (
+                                    <PayPalButton amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handlePayPalError} disabled={paymentStatus !== 'idle'} />
+                                  )}
+                                  {RAZORPAY_KEY_ID && (
+                                      <RazorpayButton amount={PRO_TIER.price} description={PRO_TIER.description} onSuccess={handleProSubscriptionSuccess} onError={handleRazorpayError} disabled={paymentStatus !== 'idle'} />
+                                  )}
                                   <p className="text-xs text-slate-500 mt-2">Billed monthly. Cancel anytime.</p>
-                                </div>}
+                                </div>
                             </div>)}
                       </div>
                       {paymentStatus === 'processing' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><Spinner /><p className="text-lg animate-pulse text-cyan-300">Processing payment...</p></div>)}
