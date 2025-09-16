@@ -1,14 +1,10 @@
 
-import { GoogleGenAI, Modality, HarmCategory, HarmBlockThreshold, Type } from "@google/genai";
-import { API_KEY } from "../config";
+import { GoogleGenAI, Modality, HarmCategory, HarmBlockThreshold } from "@google/genai";
 import { ImageData } from "../types";
 
-// Conditionally initialize the AI client only if the API key is provided.
-const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
-
-if (!ai) {
-  console.error("VITE_API_KEY is not set in the environment variables. AI features are disabled.");
-}
+// Initialize the AI client directly with the environment variable as per guidelines.
+// This assumes `process.env.API_KEY` is securely provided in the execution environment.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Define strict safety settings to prevent unsafe content generation.
 const safetySettings = [
@@ -33,15 +29,13 @@ const safetySettings = [
 // System instruction to prevent processing images of minors.
 const systemInstruction = "You are a responsible AI image editing assistant. Your most critical safety rule is to never process, edit, or generate images that depict children or individuals who appear to be under 18 years of age. If an uploaded image seems to contain a minor, you must strictly refuse the request. Do not proceed with the edit. Instead, reply with only the following text: 'Error: Image appears to contain a child and cannot be processed.'";
 
-// FIX: Implement and export editImageWithGemini to handle image editing requests.
-// This function was missing, causing an export error in App.tsx and an initialization error in this file.
 export const editImageWithGemini = async (
   originalImage: ImageData,
   prompt: string,
   referenceImage: ImageData | null = null
 ): Promise<string> => {
-  if (!ai) {
-    throw new Error("Gemini AI client is not initialized. Check API_KEY.");
+  if (!process.env.API_KEY) {
+    throw new Error("Gemini AI client is not configured. The API_KEY is missing from the environment.");
   }
 
   const parts: any[] = [

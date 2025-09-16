@@ -35,26 +35,6 @@ const AiBrainSpinner: React.FC = () => {
         <circle cx="30" cy="75" r="3" fill="#06b6d4" className="animate-node-pulse" style={{ animationDelay: '1.2s' }} />
         <circle cx="70" cy="75" r="3" fill="#06b6d4" className="animate-node-pulse" style={{ animationDelay: '1.4s' }} />
       </svg>
-      <style>
-        {`
-                    @keyframes brain-draw {
-                        0% { stroke-dashoffset: 150; }
-                        50% { stroke-dashoffset: 0; }
-                        100% { stroke-dashoffset: -150; }
-                    }
-                    .animate-brain-draw {
-                        animation: brain-draw 3s ease-in-out infinite;
-                    }
-                    @keyframes node-pulse {
-                        0%, 100% { transform: scale(1); opacity: 1; }
-                        50% { transform: scale(1.5); opacity: 0.7; }
-                    }
-                    .animate-node-pulse {
-                        animation: node-pulse 2s ease-in-out infinite;
-                        transform-origin: center;
-                    }
-                `}
-      </style>
     </div>
   );
 };
