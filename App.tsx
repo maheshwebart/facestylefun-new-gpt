@@ -83,15 +83,6 @@ const PRO_TIER = {
   description: 'facestyle.fun Pro Subscription',
 };
 
-const LOADING_MESSAGES = [
-  "Analyzing image features...",
-  "Consulting with the digital muses...",
-  "Painting with light and logic...",
-  "Applying algorithmic artistry...",
-  "Reticulating splines...",
-  "This can take up to a minute...",
-];
-
 const App: React.FC = () => {
   const { user, profile, refreshProfile } = useAuth();
 
@@ -135,8 +126,6 @@ const App: React.FC = () => {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'processing' | 'success'>('idle');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [loadingMessage, setLoadingMessage] = useState<string>(LOADING_MESSAGES[0]);
 
   // Effect to persist guest credits to localStorage
   useEffect(() => {
@@ -189,23 +178,6 @@ const App: React.FC = () => {
     };
     if (isProUser) fetchCloudHistory(); else setCloudHistory([]);
   }, [user, isProUser]);
-
-  useEffect(() => {
-    let interval: number | undefined;
-    if (isLoading) {
-      setLoadingMessage(LOADING_MESSAGES[0]); // Reset to first message on new load
-      interval = window.setInterval(() => {
-        setLoadingMessage(prev => {
-          const currentIndex = LOADING_MESSAGES.indexOf(prev);
-          const nextIndex = (currentIndex + 1) % LOADING_MESSAGES.length;
-          return LOADING_MESSAGES[nextIndex];
-        });
-      }, 3000); // Change message every 3 seconds
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isLoading]);
 
   const addWatermark = (base64WithHeader: string): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -518,8 +490,8 @@ const App: React.FC = () => {
                 {isLoading && (
                   <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center rounded-2xl z-20 backdrop-blur-sm text-center p-4">
                     <AiBrainSpinner />
-                    <p className="mt-4 text-lg font-semibold text-cyan-300">{loadingMessage}</p>
-                    <p className="text-sm text-slate-400 mt-1">Your masterpiece is being created.</p>
+                    <p className="mt-4 text-lg font-semibold text-cyan-300">AI is working its magic...</p>
+                    <p className="text-sm text-slate-400 mt-1">This can take up to a minute.</p>
                   </div>
                 )}
               </div>
