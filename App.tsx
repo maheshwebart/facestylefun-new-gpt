@@ -1,7 +1,8 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { editImageWithGemini } from './services/geminiService';
-import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, HistoryItem, Gender } from './types';
+import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, BackgroundStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, BackgroundStyleId, HistoryItem, Gender } from './types';
 import Header from './components/Header';
 import ImageUpload from './components/ImageUpload';
 import ReferenceImageUpload from './components/ReferenceImageUpload';
@@ -30,7 +31,8 @@ import {
   BobCutIcon, PonytailIcon, LongStraightIcon, PixieCutIcon, ShagCutIcon, BraidsIcon, UpdoIcon,
   FullBeardIcon, GoateeIcon, StubbleIcon, VanDykeIcon, MuttonChopsIcon,
   AviatorsIcon, WayfarersIcon, RoundIcon, SportyIcon, ClubmastersIcon,
-  BrightenFaceIcon
+  BrightenFaceIcon, BlemishesIcon, TeethIcon, WrinklesIcon,
+  ProfessionalIcon, BeachIcon, CityIcon, CafeIcon
 } from './components/HairStyleIcons';
 
 const MALE_HAIR_STYLES: HairStyle[] = [
@@ -65,9 +67,19 @@ const SUNGLASSES_STYLES: SunglassesStyle[] = [
     { id: 'sporty', name: 'Sporty', prompt: 'a pair of sporty, wraparound sunglasses', icon: SportyIcon },
     { id: 'clubmasters', name: 'Clubmasters', prompt: 'a pair of stylish clubmaster sunglasses', icon: ClubmastersIcon },
 ];
+const BACKGROUND_STYLES: BackgroundStyle[] = [
+    { id: 'professional', name: 'Professional', prompt: 'change the background to a professional, out-of-focus office or studio setting', icon: ProfessionalIcon },
+    { id: 'beach', name: 'Beach', prompt: 'change the background to a sunny tropical beach with palm trees and clear water', icon: BeachIcon },
+    { id: 'city', name: 'City Night', prompt: 'change the background to a vibrant, blurry city street at night with neon lights', icon: CityIcon },
+    { id: 'cafe', name: 'Cozy Cafe', prompt: 'change the background to the interior of a warm, cozy cafe', icon: CafeIcon },
+];
 const CORRECTION_STYLES: CorrectionStyle[] = [
     { id: 'face-brighten', name: 'Brighten Face', prompt: 'subtly brighten the lighting on the person\'s face', icon: BrightenFaceIcon },
+    { id: 'remove-blemishes', name: 'Remove Blemishes', prompt: 'gently remove any visible skin blemishes like pimples or spots, keeping the skin texture natural', icon: BlemishesIcon },
+    { id: 'whiten-teeth', name: 'Whiten Teeth', prompt: 'subtly whiten the person\'s teeth if they are smiling and teeth are visible, making it look natural', icon: TeethIcon },
+    { id: 'reduce-wrinkles', name: 'Reduce Wrinkles', prompt: 'soften the appearance of wrinkles around the eyes and mouth for a slightly younger, refreshed look without looking artificial', icon: WrinklesIcon },
 ];
+
 const PRIVACY_POLICY = "Your privacy is important to us. When you upload an image, it is sent to Google's Gemini API for processing. We do not store your images on our servers after the editing process is complete. The generated image is available for you to download directly and is not retained by us. By using this service, you agree to Google's API terms of service and privacy policy.";
 const TERMS_OF_SERVICE = "This service is provided for entertainment purposes. You are responsible for the images you upload and must have the necessary rights to use them. Do not upload content that is illegal, or infringes on the rights of others. We are not liable for any misuse of this service or for the content generated. The service is provided 'as is' without warranties of any kind. We reserve the right to change or discontinue the service at any time.";
 
@@ -96,6 +108,7 @@ const App: React.FC = () => {
   const [selectedBeardId, setSelectedBeardId] = useState<BeardStyleId | null>(null);
   const [selectedSunglassesId, setSelectedSunglassesId] = useState<SunglassesStyleId | null>(null);
   const [selectedCorrectionId, setSelectedCorrectionId] = useState<CorrectionStyleId | null>(null);
+  const [selectedBackgroundId, setSelectedBackgroundId] = useState<BackgroundStyleId | null>(null);
   const [customPrompt, setCustomPrompt] = useState<string>('');
   
   const [gender, setGender] = useState<Gender>('female');
@@ -213,7 +226,6 @@ const App: React.FC = () => {
         }
       };
       reader.onerror = () => setError(`Failed to read the ${type} image file.`);
-      // Fix: Corrected typo from readDataURL to readAsDataURL.
       reader.readAsDataURL(file);
   }
   
@@ -289,11 +301,13 @@ const App: React.FC = () => {
   };
   
   const featureCount = useMemo(() => {
-    const count = [selectedHairId, selectedBeardId, selectedSunglassesId, referenceImage, selectedCorrectionId, customPrompt.trim()].filter(Boolean).length;
+    const count = [selectedHairId, selectedBeardId, selectedSunglassesId, referenceImage, selectedCorrectionId, customPrompt.trim(), selectedBackgroundId].filter(Boolean).length;
     return Math.max(1, count);
-  }, [selectedHairId, selectedBeardId, selectedSunglassesId, referenceImage, selectedCorrectionId, customPrompt]);
+  }, [selectedHairId, selectedBeardId, selectedSunglassesId, referenceImage, selectedCorrectionId, customPrompt, selectedBackgroundId]);
 
   const effectiveGender = gender;
+  
+  const hasSelection = Boolean(selectedHairId || selectedBeardId || selectedSunglassesId || referenceImage || selectedCorrectionId || selectedBackgroundId || customPrompt.trim());
 
   const handleApplyChanges = async () => {
     if (isLoading || !hasSelection) {
@@ -333,6 +347,11 @@ const App: React.FC = () => {
         const style = SUNGLASSES_STYLES.find(s => s.id === selectedSunglassesId);
         if (style) promptParts.push(`Add sunglasses: ${style.prompt}.`);
     }
+    
+    if (selectedBackgroundId) {
+        const style = BACKGROUND_STYLES.find(s => s.id === selectedBackgroundId);
+        if (style) promptParts.push(`Background: ${style.prompt}.`);
+    }
 
     if (selectedCorrectionId) {
         const style = CORRECTION_STYLES.find(s => s.id === selectedCorrectionId);
@@ -366,8 +385,9 @@ const App: React.FC = () => {
         if (!selectedTier) throw new Error('No credit tier selected. Please try again.');
         if (!supabase) throw new Error("Could not connect to the database. Please try again later.");
         
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session?.user) {
+        // Fix: Use Supabase v1 session API.
+        const session = supabase.auth.session();
+        if (!session?.user) {
             setShowPurchaseModal(false); setPaymentStatus('idle'); setShowAuthModal(true);
             setError("Authentication error. Please sign in to add credits to your account.");
             return;
@@ -404,8 +424,9 @@ const App: React.FC = () => {
     try {
         if (!supabase) throw new Error("Could not connect to the database. Please try again later.");
 
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session?.user) {
+        // Fix: Use Supabase v1 session API.
+        const session = supabase.auth.session();
+        if (!session?.user) {
             setShowPurchaseModal(false); setPaymentStatus('idle'); setShowAuthModal(true);
             setError("Please sign in to activate your Pro subscription."); return;
         }
@@ -441,7 +462,7 @@ const App: React.FC = () => {
   
   const handleResetSelections = useCallback(() => {
       setEditedImage(null); setError(null); setReferenceImage(null); setSelectedHairId(null); setSelectedBeardId(null);
-      setSelectedSunglassesId(null); setSelectedCorrectionId(null); setCustomPrompt('');
+      setSelectedSunglassesId(null); setSelectedCorrectionId(null); setCustomPrompt(''); setSelectedBackgroundId(null);
   }, []);
 
   const handleStartOver = () => { setOriginalImage(null); setIsLoading(false); handleResetSelections(); };
@@ -466,7 +487,6 @@ const App: React.FC = () => {
   };
   
   const currentCredits = profile?.credits ?? guestCredits;
-  const hasSelection = Boolean(selectedHairId || selectedBeardId || selectedSunglassesId || referenceImage || selectedCorrectionId || customPrompt.trim());
   const showPrivacyPolicy = () => setModalContent({ title: 'Privacy Policy', content: PRIVACY_POLICY });
   const showTerms = () => setModalContent({ title: 'Terms of Service', content: TERMS_OF_SERVICE });
   const getButtonText = () => {
@@ -506,6 +526,7 @@ const App: React.FC = () => {
                 <ReferenceImageUpload referenceImage={referenceImage} onImageUpload={(e) => e.target.files && processImageFile(e.target.files[0], 'reference')} onRemoveImage={() => setReferenceImage(null)} disabled={isLoading || !effectiveGender} />
                 {effectiveGender === 'male' && <HairStyleSelector title="Beard" styles={BEARD_STYLES} selectedStyleId={selectedBeardId} onStyleSelect={(style) => setSelectedBeardId(style ? style.id as BeardStyleId : null)} disabled={isLoading} />}
                 <HairStyleSelector title="Sunglasses" styles={SUNGLASSES_STYLES} selectedStyleId={selectedSunglassesId} onStyleSelect={(style) => setSelectedSunglassesId(style ? style.id as SunglassesStyleId : null)} disabled={isLoading} />
+                <HairStyleSelector title="Background" styles={BACKGROUND_STYLES} selectedStyleId={selectedBackgroundId} onStyleSelect={(style) => setSelectedBackgroundId(style ? style.id as BackgroundStyleId : null)} disabled={isLoading} />
                 <HairStyleSelector title="Corrections" styles={CORRECTION_STYLES} selectedStyleId={selectedCorrectionId} onStyleSelect={(style) => setSelectedCorrectionId(style ? style.id as CorrectionStyleId : null)} disabled={isLoading} />
                 <CustomPromptInput value={customPrompt} onChange={setCustomPrompt} disabled={isLoading} />
             </div>
@@ -609,7 +630,7 @@ const App: React.FC = () => {
         </Modal>
       )}
       <div style={{ position: 'fixed', bottom: '10px', right: '10px', backgroundColor: 'rgba(0, 255, 255, 0.2)', color: '#06b6d4', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', zIndex: 100, backdropFilter: 'blur(2px)' }}>
-        v1.32
+        v1.33
       </div>
     </div>
   );

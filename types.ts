@@ -1,5 +1,6 @@
 import React from 'react';
-import type { User as SupabaseUser } from '@supabase/supabase-js';
+// Fix: Use @supabase/gotrue-js for User type as it's not exported from the root of older @supabase/supabase-js versions.
+import type { User as SupabaseUser } from '@supabase/gotrue-js';
 
 export type User = SupabaseUser;
 
@@ -42,8 +43,12 @@ export type SunglassesStyleId = 'aviators' | 'wayfarers' | 'round' | 'sporty' | 
 export type SunglassesStyle = Style<SunglassesStyleId>;
 
 // Correction Styles
-export type CorrectionStyleId = 'face-brighten';
+export type CorrectionStyleId = 'face-brighten' | 'remove-blemishes' | 'whiten-teeth' | 'reduce-wrinkles';
 export type CorrectionStyle = Style<CorrectionStyleId>;
+
+// Background Styles
+export type BackgroundStyleId = 'professional' | 'beach' | 'city' | 'cafe';
+export type BackgroundStyle = Style<BackgroundStyleId>;
 
 // History Item
 export interface HistoryItem {

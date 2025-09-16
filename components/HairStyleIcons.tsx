@@ -256,3 +256,67 @@ export const BrightenFaceIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props)
         <path d="m18.36 5.64 1.42-1.42" />
     </svg>
 );
+
+export const BlemishesIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" />
+        <path d="m15 15-6-6m6 0-6 6" />
+        <path d="m9.5 7.5 1 1" />
+        <path d="m13.5 11.5 1 1" />
+    </svg>
+);
+
+export const TeethIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M7 13c.5-1 1.5-2 5-2s4.5 1 5 2" />
+        <path d="M8 17h8" />
+        <path d="M4.5 12.5a8 8 0 1 1 15 0" />
+        <path d="M17 10h.01" />
+    </svg>
+);
+
+export const WrinklesIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.5 13.5c-2-2-4-2-6 0" />
+        <path d="M17.5 16.5c-3-3-6-3-9 0" />
+        <path d="M11.5 10.5c-1-1-2-1-3 0" />
+        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
+    </svg>
+);
+
+
+// --- Background Icons ---
+export const ProfessionalIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <circle cx="12" cy="12" r="6" />
+        <circle cx="12" cy="12" r="2" />
+    </svg>
+);
+
+export const BeachIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l3 3" />
+        <path d="M12 22a10 10 0 0 0-7.07-2.93L3 17" />
+        <path d="M5.22 5.22a9.95 9.95 0 0 1 4.56-2.07L12 2" />
+        <path d="M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" />
+        <path d="M18 20a6 6 0 0 0-12 0" />
+    </svg>
+);
+
+export const CityIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 21h16" />
+        <path d="M6 21V10" />
+        <path d="M11 21V4" />
+        <path d="M16 21V14" />
+    </svg>
+);
+
+export const CafeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8h1a4 4 0 0 1 0 8h-1" />
+        <path d="M2 8h14v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" />
+        <path d="M6 1v3m4-3v3m4-3v3" />
+    </svg>
+);
