@@ -625,7 +625,7 @@ const App: React.FC = () => {
         </Modal>
       )}
       <div style={{ position: 'fixed', bottom: '10px', right: '10px', backgroundColor: 'rgba(0, 255, 255, 0.2)', color: '#06b6d4', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', zIndex: 100, backdropFilter: 'blur(2px)' }}>
-        v1.33
+        v1.34
       </div>
     </div>
   );

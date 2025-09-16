@@ -51,52 +51,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
-    let isMounted = true; // Flag to prevent state updates if component is unmounted
-
-    const getInitialSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (isMounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          if (session?.user) {
-            await fetchProfile(session.user.id);
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching initial session:", err);
-        if (isMounted) {
-          setSession(null);
-          setUser(null);
-          setProfile(null);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    getInitialSession();
+    setLoading(true);
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (isMounted) {
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        if (currentUser) {
-          await fetchProfile(currentUser.id);
-        } else {
-          setProfile(null);
-        }
-        if (loading) {
-          setLoading(false);
-        }
+      setSession(session);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
+        await fetchProfile(currentUser.id);
+      } else {
+        setProfile(null);
       }
+      setLoading(false);
     });
 
     return () => {
-      isMounted = false; // Cleanup on unmount
       authListener?.subscription.unsubscribe();
     };
   }, []); // Empty dependency array ensures this effect runs only once on mount
