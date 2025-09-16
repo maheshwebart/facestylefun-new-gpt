@@ -1,8 +1,6 @@
 
-
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
-// Fix: For Supabase v2, types are imported from the main package.
 import type { AuthError, Session, User } from '@supabase/supabase-js';
 import type { Profile } from '../types';
 
@@ -53,49 +51,56 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return;
     }
 
+    let isMounted = true; // Flag to prevent state updates if component is unmounted
+
     const getInitialSession = async () => {
       try {
-        // Fix: Use supabase.auth.getSession() for v2 API. It's asynchronous.
         const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchProfile(session.user.id);
+        if (isMounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          if (session?.user) {
+            await fetchProfile(session.user.id);
+          }
         }
       } catch (err) {
         console.error("Error fetching initial session:", err);
-        setSession(null);
-        setUser(null);
-        setProfile(null);
+        if (isMounted) {
+          setSession(null);
+          setUser(null);
+          setProfile(null);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     getInitialSession();
 
-    // Fix: The method name is correct for v2.
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        await fetchProfile(currentUser.id);
-      } else {
-        setProfile(null);
-      }
-      // Failsafe: Ensure that any auth event clears the initial loading state.
-      if (loading) {
-        setLoading(false);
+      if (isMounted) {
+        setSession(session);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          await fetchProfile(currentUser.id);
+        } else {
+          setProfile(null);
+        }
+        if (loading) {
+          setLoading(false);
+        }
       }
     });
 
     return () => {
-      // Fix: Unsubscribe call for v2 API.
+      isMounted = false; // Cleanup on unmount
       authListener?.subscription.unsubscribe();
     };
-  }, [loading]); // Added loading to dependency array for the failsafe
+  }, []); // Empty dependency array ensures this effect runs only once on mount
+
 
   const refreshProfile = useCallback(async () => {
     if (user) {
@@ -113,7 +118,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithPassword = useCallback(async (email: string) => {
     if (!supabase) return { error: null };
     setLoading(true);
-    // Fix: Use `signInWithOtp` for magic link in v2.
     const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) {
       setError(error);
@@ -126,7 +130,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = useCallback(async (email: string) => {
     if (!supabase) return { data: null, error: null };
     setLoading(true);
-    // Fix: Use v2 `signUp` response destructuring.
     const { data, error } = await supabase.auth.signUp({
       email,
       password: Math.random().toString(36).slice(-8)

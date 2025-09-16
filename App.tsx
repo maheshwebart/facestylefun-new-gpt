@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { editImageWithGemini } from './services/geminiService';
 import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, BackgroundStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, BackgroundStyleId, HistoryItem, Gender } from './types';
@@ -227,7 +225,6 @@ const App: React.FC = () => {
       }
     };
     reader.onerror = () => setError(`Failed to read the ${type} image file.`);
-    // Fix: Corrected typo from readDataURL to readAsDataURL.
     reader.readAsDataURL(file);
   }
 
@@ -259,19 +256,15 @@ const App: React.FC = () => {
       try {
         if (!isProUser) {
           if (user && supabase) {
-            // New robust flow: call RPC that returns the new credit balance.
             const { data: newCredits, error: rpcError } = await supabase.rpc('add_credits', { credits_to_add: -cost });
 
             if (rpcError) {
               console.error("RPC error deducting credits:", rpcError);
               throw new Error("Failed to deduct credits from your account.");
             }
-
-            // Instantly update the UI with the new balance from the DB, avoiding race conditions.
             if (typeof newCredits === 'number') {
               updateLocalProfile({ credits: newCredits });
             } else {
-              // Fallback to old method if RPC is not updated, but this is less reliable.
               console.warn("RPC 'add_credits' did not return new balance. Using fallback refresh.");
               await refreshProfile();
             }
@@ -387,7 +380,6 @@ const App: React.FC = () => {
       if (!selectedTier) throw new Error('No credit tier selected. Please try again.');
       if (!supabase) throw new Error("Could not connect to the database. Please try again later.");
 
-      // Fix: Use Supabase v2 async session API.
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         setShowPurchaseModal(false); setPaymentStatus('idle'); setShowAuthModal(true);
@@ -407,12 +399,6 @@ const App: React.FC = () => {
 
       await refreshProfile();
       setPaymentStatus('success');
-
-      setTimeout(() => {
-        setShowPurchaseModal(false); setSelectedTier(CREDIT_TIERS[1]); setPaymentStatus('idle');
-        setError(null); setPurchaseReason(null);
-      }, 2000);
-
     } catch (err) {
       setError(err instanceof Error ? `Payment processing failed: ${err.message}` : 'An unknown error occurred while updating your profile. Please contact support.');
       setPaymentStatus('idle');
@@ -426,7 +412,6 @@ const App: React.FC = () => {
     try {
       if (!supabase) throw new Error("Could not connect to the database. Please try again later.");
 
-      // Fix: Use Supabase v2 async session API.
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
         setShowPurchaseModal(false); setPaymentStatus('idle'); setShowAuthModal(true);
@@ -444,23 +429,24 @@ const App: React.FC = () => {
 
       await refreshProfile();
       setPaymentStatus('success');
-
-      setTimeout(() => {
-        setShowPurchaseModal(false); setPaymentStatus('idle');
-        setError(null); setPurchaseReason(null);
-      }, 2000);
-
     } catch (err) {
       setError(err instanceof Error ? `Failed to activate Pro plan: ${err.message}` : 'An unknown error occurred while activating your Pro plan.');
       setPaymentStatus('idle');
     }
   }, [refreshProfile]);
 
+  const closePurchaseModalAndReset = useCallback(() => {
+    if (paymentStatus === 'processing') return; // Don't allow closing while processing
+    setShowPurchaseModal(false);
+    setPaymentStatus('idle');
+    setSelectedTier(CREDIT_TIERS[1]);
+    setError(null);
+    setPurchaseReason(null);
+  }, [paymentStatus]);
+
   const handleOpenPurchaseModal = (tab: 'credits' | 'pro' = 'credits') => {
     setPurchaseReason(null); setPurchaseModalTab(tab); setShowPurchaseModal(true); setPaymentStatus('idle'); setSelectedTier(CREDIT_TIERS[1]); setError(null);
   }
-
-  const handleClosePurchaseModal = () => { if (paymentStatus !== 'processing') { setShowPurchaseModal(false); setPurchaseReason(null); } };
 
   const handleResetSelections = useCallback(() => {
     setEditedImage(null); setError(null); setReferenceImage(null); setSelectedHairId(null); setSelectedBeardId(null);
@@ -553,7 +539,7 @@ const App: React.FC = () => {
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       {showTermsModal && <TermsModal onAgree={handleTermsAgree} onCancel={() => setShowTermsModal(false)} />}
       {showPurchaseModal && (
-        <Modal title={purchaseReason ? "Not Enough Credits" : "Get More From facestyle.fun"} onClose={handleClosePurchaseModal}>
+        <Modal title={purchaseReason ? "Not Enough Credits" : "Get More From facestyle.fun"} onClose={closePurchaseModalAndReset}>
           <PayPalScriptProvider options={paypalOptions}>
             <div className="text-center">
               {purchaseReason && !error && (<div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-500/40 rounded-xl"><p className="font-semibold text-yellow-200">{purchaseReason}</p></div>)}
@@ -625,7 +611,14 @@ const App: React.FC = () => {
                     </div>)}
                 </div>
                 {paymentStatus === 'processing' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><Spinner /><p className="text-lg animate-pulse text-cyan-300">Processing payment...</p></div>)}
-                {paymentStatus === 'success' && (<div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl"><svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><p className="text-lg text-green-300">Purchase Successful!</p><p className="text-sm text-slate-400">Your account has been updated.</p></div>)}
+                {paymentStatus === 'success' && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 bg-gray-900 rounded-b-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <p className="text-lg text-green-300">Purchase Successful!</p>
+                    <p className="text-sm text-slate-400">Your account has been updated.</p>
+                    <Button onClick={closePurchaseModalAndReset} variant="primary" className="mt-4">Continue</Button>
+                  </div>
+                )}
               </div>
             </div>
           </PayPalScriptProvider>
