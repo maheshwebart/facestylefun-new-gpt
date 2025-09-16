@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { editImageWithGemini } from './services/geminiService';
 import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, HistoryItem, Gender } from './types';
@@ -288,22 +287,29 @@ const App: React.FC = () => {
       setPurchaseReason(reason); setError(null); setPurchaseModalTab('credits'); setShowPurchaseModal(true); return;
     }
 
-    let fullPrompt = ''; const stylePrompts: string[] = [];
-    if (selectedBeardId && effectiveGender === 'male') stylePrompts.push(`add ${BEARD_STYLES.find(s => s.id === selectedBeardId)?.prompt}`);
-    if (selectedSunglassesId) stylePrompts.push(`add ${SUNGLASSES_STYLES.find(s => s.id === selectedSunglassesId)?.prompt}`);
-    if (selectedCorrectionId) stylePrompts.push(`${CORRECTION_STYLES.find(s => s.id === selectedCorrectionId)?.prompt}`);
+    let fullPrompt = '';
+    const stylePrompts: string[] = [];
+
+    if (selectedBeardId && effectiveGender === 'male') stylePrompts.push(BEARD_STYLES.find(s => s.id === selectedBeardId)?.prompt as string);
+    if (selectedSunglassesId) stylePrompts.push(SUNGLASSES_STYLES.find(s => s.id === selectedSunglassesId)?.prompt as string);
+    if (selectedCorrectionId) stylePrompts.push(CORRECTION_STYLES.find(s => s.id === selectedCorrectionId)?.prompt as string);
     if (customPrompt.trim()) stylePrompts.push(customPrompt.trim());
 
     const hairStyles = effectiveGender === 'male' ? MALE_HAIR_STYLES : FEMALE_HAIR_STYLES;
+
     if (referenceImage) {
-      const hairstylePrompt = `The first image is the main image of a person. The second image is a style reference. Apply the hairstyle from the second image to the person in the first image, correcting any hair loss. The person is a ${effectiveGender}.`;
-      fullPrompt = stylePrompts.length > 0 ? `${hairstylePrompt} Additionally, apply the following changes: ${stylePrompts.join(', ')}.` : hairstylePrompt;
+      const mainPrompt = `Use the hairstyle from the second image on the ${effectiveGender} person in the first image. Correct hair loss.`;
+      fullPrompt = stylePrompts.length > 0 ? `${mainPrompt} Also, add ${stylePrompts.join(', ')}.` : mainPrompt;
     } else {
-      if (selectedHairId) stylePrompts.unshift(`correct any hair loss and apply ${hairStyles.find(s => s.id === selectedHairId)?.prompt}`);
-      else if (stylePrompts.length === 0) stylePrompts.push('subtly enhance the person\'s existing hairstyle and correct any visible hair loss to create a fuller, more styled look.');
-      fullPrompt = `For the ${effectiveGender} in the image, apply the following changes: ${stylePrompts.join(', ')}.`;
+      if (selectedHairId) {
+        stylePrompts.unshift(`a new hairstyle: ${hairStyles.find(s => s.id === selectedHairId)?.prompt}`);
+      } else if (stylePrompts.length === 0) {
+        stylePrompts.push('subtly enhance existing hairstyle and correct hair loss.');
+      }
+      fullPrompt = `To the ${effectiveGender} in the image, apply these changes: ${stylePrompts.join(', ')}.`;
     }
-    fullPrompt += ' Ensure the final result looks natural and realistic, seamlessly blending with the person\'s original features and lighting.';
+
+    fullPrompt += ' Make the result realistic.';
     await executeImageEdit(cost, fullPrompt);
   };
 

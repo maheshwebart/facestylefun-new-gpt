@@ -1,8 +1,7 @@
+
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { supabase } from '../services/supabaseClient';
-// FIX: Import AuthError as a value for `instanceof` checks, and other types as type-only.
-import { AuthError } from '@supabase/supabase-js';
-import type { Session, User } from '@supabase/supabase-js';
+import type { AuthError, Session, User } from '@supabase/supabase-js';
 import type { Profile } from '../types';
 
 interface AuthContextType {
@@ -11,8 +10,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   error: AuthError | null;
-  signInWithPassword: (email: string, password: string) => Promise<{ error: AuthError | null }>;
-  signUp: (email: string, password: string) => Promise<{ user: User | null; error: AuthError | null }>;
+  signInWithPassword: (email: string) => Promise<any>;
+  signUp: (email: string) => Promise<any>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -27,36 +26,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<AuthError | null>(null);
 
-  useEffect(() => {
-    if (!supabase) {
-        setLoading(false);
-        return;
-    }
-    
-    // The onAuthStateChange listener is called once on attachment, handling the initial session check.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      try {
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        
-        if (currentUser) {
-          await fetchProfile(currentUser.id);
-        } else {
-          setProfile(null);
-        }
-      } catch (e) {
-          console.error("Error in onAuthStateChange handler:", e);
-      } finally {
-        setLoading(false); // Ensure loading is false after initial check and any auth changes.
-      }
-    });
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, []);
-
   const fetchProfile = async (userId: string) => {
     if (!supabase) return;
     try {
@@ -65,7 +34,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .select('*')
         .eq('id', userId)
         .single();
-      
+
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         throw error;
       }
@@ -74,63 +43,83 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error('Error fetching profile:', error);
     }
   };
-  
-  const refreshProfile = async () => {
-    if (user && supabase) {
-        setLoading(true);
-        try {
-          await fetchProfile(user.id);
-        } finally {
-          setLoading(false);
+
+  useEffect(() => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
+    const getInitialSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await fetchProfile(session.user.id);
         }
+      } catch (err) {
+        console.error("Error fetching initial session:", err);
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    getInitialSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        // Fetch profile without setting loading, as it's a background update
+        await fetchProfile(currentUser.id);
+      } else {
+        setProfile(null);
+      }
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, []);
+
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchProfile(user.id);
     }
   };
 
-  const signInWithPassword = async (email: string, password: string) => {
-    if (!supabase) return { error: null };
+  const signInWithPassword = async (email: string) => {
+    if (!supabase) return;
     setLoading(true);
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-          setError(error);
-          console.error('Sign in error:', error);
-      } else {
-          setError(null);
-      }
-      return { error };
-    } catch (e) {
-      const caughtError = e instanceof AuthError ? e : new AuthError('An unexpected error occurred during sign-in.');
-      setError(caughtError);
-      console.error('Unexpected Sign in error:', caughtError);
-      return { error: caughtError };
-    } finally {
-      setLoading(false);
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    if (error) {
+      setError(error);
+      console.error('Sign in error:', error);
     }
+    setLoading(false);
+    return { error };
   };
 
-  const signUp = async (email: string, password: string) => {
-    if (!supabase) return { user: null, error: null };
+  const signUp = async (email: string) => {
+    if (!supabase) return;
     setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({ 
-        email,
-        password
-      });
-      if (error) {
-          setError(error);
-          console.error('Sign up error:', error);
-      } else {
-          setError(null);
-      }
-      return { user: data.user, error };
-    } catch (e) {
-      const caughtError = e instanceof AuthError ? e : new AuthError('An unexpected error occurred during sign-up.');
-      setError(caughtError);
-      console.error('Unexpected Sign up error:', caughtError);
-      return { user: null, error: caughtError };
-    } finally {
-      setLoading(false);
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      // A password is required but Supabase magic link makes it so user doesn't need to create one initially
+      password: Math.random().toString(36).slice(-8)
+    });
+    if (error) {
+      setError(error);
+      console.error('Sign up error:', error);
     }
+    setLoading(false);
+    return { user: data.user, error };
   };
 
   const signOut = async () => {
@@ -139,28 +128,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
-    // Loading state will be set to false by the onAuthStateChange listener
+    setLoading(false);
   };
-  
+
   const updateProfile = async (updates: Partial<Profile>) => {
-      if (!supabase || !user) {
-        throw new Error("Authentication error: Cannot update profile. User is not logged in.");
-      }
-      
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', user.id)
-            .select()
-            .single();
-            
-        if (error) throw error;
-        if (data) setProfile(data);
-      } finally {
-          setLoading(false);
-      }
+    if (!supabase || !user) return;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (data) setProfile(data);
   };
 
   const value = {
