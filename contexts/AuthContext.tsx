@@ -16,6 +16,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
+  updateLocalProfile: (updates: Partial<Profile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -35,7 +36,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .select('*')
         .eq('id', userId)
         .single();
-      
+
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         throw error;
       }
@@ -47,27 +48,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (!supabase) {
-        setLoading(false);
-        return;
+      setLoading(false);
+      return;
     }
 
     const getInitialSession = async () => {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            setSession(session);
-            setUser(session?.user ?? null);
-            
-            if (session?.user) {
-                await fetchProfile(session.user.id);
-            }
-        } catch (err) {
-            console.error("Error fetching initial session:", err);
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-        } finally {
-            setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await fetchProfile(session.user.id);
         }
+      } catch (err) {
+        console.error("Error fetching initial session:", err);
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
     getInitialSession();
@@ -77,31 +78,41 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {
-        // Fetch profile without setting loading, as it's a background update
         await fetchProfile(currentUser.id);
       } else {
         setProfile(null);
+      }
+      // Failsafe: Ensure that any auth event clears the initial loading state.
+      if (loading) {
+        setLoading(false);
       }
     });
 
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, []);
-  
+  }, [loading]); // Added loading to dependency array for the failsafe
+
   const refreshProfile = useCallback(async () => {
     if (user) {
-        await fetchProfile(user.id);
+      await fetchProfile(user.id);
     }
   }, [user]);
+
+  const updateLocalProfile = useCallback((updates: Partial<Profile>) => {
+    setProfile(prevProfile => {
+      if (!prevProfile) return null;
+      return { ...prevProfile, ...updates };
+    });
+  }, []);
 
   const signInWithPassword = useCallback(async (email: string) => {
     if (!supabase) return { error: null };
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) {
-        setError(error);
-        console.error('Sign in error:', error);
+      setError(error);
+      console.error('Sign in error:', error);
     }
     setLoading(false);
     return { error };
@@ -110,14 +121,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = useCallback(async (email: string) => {
     if (!supabase) return { user: null, error: null };
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({ 
+    const { data, error } = await supabase.auth.signUp({
       email,
-      // A password is required but Supabase magic link makes it so user doesn't need to create one initially
-      password: Math.random().toString(36).slice(-8) 
+      password: Math.random().toString(36).slice(-8)
     });
     if (error) {
-        setError(error);
-        console.error('Sign up error:', error);
+      setError(error);
+      console.error('Sign up error:', error);
     }
     setLoading(false);
     return { user: data.user, error };
@@ -131,19 +141,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setProfile(null);
     setLoading(false);
   }, []);
-  
+
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
-      if (!supabase || !user) return;
-      
-      const { data, error } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', user.id)
-          .select()
-          .single();
-          
-      if (error) throw error;
-      if (data) setProfile(data);
+    if (!supabase || !user) return;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (data) setProfile(data);
   }, [user]);
 
   const value = {
@@ -157,6 +167,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signOut,
     updateProfile,
     refreshProfile,
+    updateLocalProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
