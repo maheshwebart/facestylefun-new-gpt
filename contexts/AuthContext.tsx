@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { supabase } from '../services/supabaseClient';
 import type { AuthError, Session, User } from '@supabase/supabase-js';
@@ -10,8 +9,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   error: AuthError | null;
-  signInWithPassword: (email: string) => Promise<any>;
-  signUp: (email: string) => Promise<any>;
+  signInWithPassword: (email: string, password: string) => Promise<any>;
+  signUp: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -94,32 +93,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const signInWithPassword = async (email: string) => {
+  const signInWithPassword = async (email: string, password: string) => {
     if (!supabase) return;
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       setError(error);
       console.error('Sign in error:', error);
     }
     setLoading(false);
-    return { error };
+    return { user: data?.user, error };
   };
 
-  const signUp = async (email: string) => {
+  const signUp = async (email: string, password: string) => {
     if (!supabase) return;
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      // A password is required but Supabase magic link makes it so user doesn't need to create one initially
-      password: Math.random().toString(36).slice(-8)
-    });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) {
       setError(error);
       console.error('Sign up error:', error);
     }
     setLoading(false);
-    return { user: data.user, error };
+    return { user: data?.user, error };
   };
 
   const signOut = async () => {
@@ -128,21 +123,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
+    setSession(null);
     setLoading(false);
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!supabase || !user) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert({ id: user.id, ...updates });
 
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select()
-      .single();
+      if (error) throw error;
 
-    if (error) throw error;
-    if (data) setProfile(data);
+      setProfile((prev) => ({ ...prev, ...updates } as Profile));
+    } catch (error) {
+      console.error('Error updating profile:', error);
+    }
   };
 
   const value = {
@@ -161,7 +158,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = (): AuthContextType => {
+export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
