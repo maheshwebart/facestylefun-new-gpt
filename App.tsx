@@ -321,32 +321,34 @@ const App: React.FC = () => {
     setPaymentStatus('processing');
     setError(null);
 
-    if (!selectedTier) {
-      setError('No credit tier selected. Please try again.');
-      setPaymentStatus('idle');
-      return;
-    }
-
-    if (!supabase) {
-      setError("Could not connect to the database. Please try again later.");
-      setPaymentStatus('idle');
-      return;
-    }
-
-    // FIX: Re-fetch the session directly from Supabase to ensure it's not stale.
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError || !session?.user) {
-      setShowPurchaseModal(false);
-      setPaymentStatus('idle');
-      setShowAuthModal(true);
-      setError("Authentication error. Please sign in to add credits to your account.");
-      return;
-    }
-
     try {
+      if (!selectedTier) {
+        throw new Error('No credit tier selected. Please try again.');
+      }
+      if (!supabase) {
+        throw new Error("Could not connect to the database. Please try again later.");
+      }
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user) {
+        setShowPurchaseModal(false);
+        setPaymentStatus('idle');
+        setShowAuthModal(true);
+        setError("Authentication error. Please sign in to add credits to your account.");
+        return;
+      }
+
       const creditsToAdd = selectedTier.credits;
-      const { error: rpcError } = await supabase.rpc('add_credits', { credits_to_add: creditsToAdd });
+
+      const operationPromise = supabase.rpc('add_credits', { credits_to_add: creditsToAdd });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Server response timed out. Please contact support if your credits don't appear shortly.")), 20000)
+      );
+
+      const { error: rpcError } = await Promise.race([operationPromise, timeoutPromise]);
+
       if (rpcError) {
         console.error('RPC Error adding credits:', rpcError);
         throw new Error(`Server error: Could not apply credits. Please contact support.`);
@@ -355,47 +357,50 @@ const App: React.FC = () => {
       await refreshProfile();
       setPaymentStatus('success');
 
+      setTimeout(() => {
+        setShowPurchaseModal(false);
+        setSelectedTier(CREDIT_TIERS[1]);
+        setPaymentStatus('idle');
+        setError(null);
+        setPurchaseReason(null);
+      }, 2000);
+
     } catch (err) {
       const errorMessage = err instanceof Error
-        ? `Payment failed: ${err.message}`
+        ? `Payment processing failed: ${err.message}`
         : 'An unknown error occurred while updating your profile. Please contact support.';
       setError(errorMessage);
       setPaymentStatus('idle');
-      return;
     }
-
-    setTimeout(() => {
-      setShowPurchaseModal(false);
-      setSelectedTier(CREDIT_TIERS[1]);
-      setPaymentStatus('idle');
-      setError(null);
-      setPurchaseReason(null);
-    }, 2000);
   }, [refreshProfile, selectedTier]);
 
   const handleProSubscriptionSuccess = useCallback(async (details?: any) => {
     setPaymentStatus('processing');
     setError(null);
 
-    if (!supabase) {
-      setError("Could not connect to the database. Please try again later.");
-      setPaymentStatus('idle');
-      return;
-    }
-
-    // FIX: Re-fetch the session directly from Supabase to ensure it's not stale.
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError || !session?.user) {
-      setShowPurchaseModal(false);
-      setPaymentStatus('idle');
-      setShowAuthModal(true);
-      setError("Please sign in to activate your Pro subscription.");
-      return;
-    }
-
     try {
-      const { error: rpcError } = await supabase.rpc('activate_pro_subscription');
+      if (!supabase) {
+        throw new Error("Could not connect to the database. Please try again later.");
+      }
+
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError || !session?.user) {
+        setShowPurchaseModal(false);
+        setPaymentStatus('idle');
+        setShowAuthModal(true);
+        setError("Please sign in to activate your Pro subscription.");
+        return;
+      }
+
+      const operationPromise = supabase.rpc('activate_pro_subscription');
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Server response timed out. Please contact support if your subscription isn't active shortly.")), 20000)
+      );
+
+      const { error: rpcError } = await Promise.race([operationPromise, timeoutPromise]);
+
       if (rpcError) {
         console.error('RPC Error activating pro:', rpcError);
         throw new Error(`Server error: Could not activate Pro plan. Please contact support.`);
@@ -404,19 +409,18 @@ const App: React.FC = () => {
       await refreshProfile();
       setPaymentStatus('success');
 
+      setTimeout(() => {
+        setShowPurchaseModal(false);
+        setPaymentStatus('idle');
+        setError(null);
+        setPurchaseReason(null);
+      }, 2000);
+
     } catch (err) {
       const errorMessage = err instanceof Error ? `Failed to activate Pro plan: ${err.message}` : 'An unknown error occurred while activating your Pro plan.';
       setError(errorMessage);
       setPaymentStatus('idle');
-      return;
     }
-
-    setTimeout(() => {
-      setShowPurchaseModal(false);
-      setPaymentStatus('idle');
-      setError(null);
-      setPurchaseReason(null);
-    }, 2000);
   }, [refreshProfile]);
 
   const handleOpenPurchaseModal = (tab: 'credits' | 'pro' = 'credits') => {
