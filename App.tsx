@@ -68,7 +68,7 @@ const CORRECTION_STYLES: CorrectionStyle[] = [
   { id: 'face-brighten', name: 'Brighten Face', prompt: 'subtly brighten the lighting on the person\'s face', icon: BrightenFaceIcon },
 ];
 const PRIVACY_POLICY = "Your privacy is important to us. When you upload an image, it is sent to Google's Gemini API for processing. We do not store your images on our servers after the editing process is complete. The generated image is available for you to download directly and is not retained by us. By using this service, you agree to Google's API terms of service and privacy policy.";
-const TERMS_OF_SERVICE = "This service is provided for entertainment purposes. You are responsible for the images you upload and must have the necessary rights to use them. Do not upload content that is illegal, offensive, or infringes on the rights of others. We are not liable for any misuse of this service or for the content generated. The service is provided 'as is' without warranties of any kind. We reserve the right to change or discontinue the service at any time.";
+const TERMS_OF_SERVICE = "This service is provided for entertainment purposes. You are responsible for the images you upload and must have the necessary rights to use them. Do not upload content that is illegal, or infringes on the rights of others. We are not liable for any misuse of this service or for the content generated. The service is provided 'as is' without warranties of any kind. We reserve the right to change or discontinue the service at any time.";
 
 const CREDIT_TIERS = [
   { credits: 10, price: '1.99', description: 'Starter Pack: 10 Credits', tag: null },
@@ -228,41 +228,52 @@ const App: React.FC = () => {
 
   const executeImageEdit = async (cost: number, fullPrompt: string) => {
     if (!originalImage) return;
-    setIsLoading(true); setError(null); setEditedImage(null);
+
+    setIsLoading(true);
+    setError(null);
+    setEditedImage(null);
+
     try {
+      // Step 1: Generate the image and get the result.
       const resultBase64 = await editImageWithGemini(originalImage, fullPrompt, referenceImage);
       const watermarkedImage = await addWatermark(`data:image/png;base64,${resultBase64}`);
+
+      // Step 2: Show the image to the user and unlock the UI immediately.
       setEditedImage(watermarkedImage);
+      setIsLoading(false);
 
-      if (!isProUser) {
-        if (user && supabase) {
-          // Decrement credits via a secure RPC call for logged-in users
-          await supabase.rpc('add_credits', { credits_to_add: -cost });
-          await refreshProfile();
+      // Step 3: Perform credit deduction and history saving as background tasks.
+      // This is wrapped in its own try/catch to prevent its failure from affecting the user experience.
+      try {
+        if (!isProUser) {
+          if (user && supabase) {
+            await supabase.rpc('add_credits', { credits_to_add: -cost });
+            await refreshProfile();
+          } else {
+            setGuestCredits(prevCredits => prevCredits - cost);
+          }
+        }
+
+        if (isProUser && user && supabase) {
+          const { data, error } = await supabase.from('creations').insert({ user_id: user.id, original_image_base64: originalImage.base64, original_image_mimetype: originalImage.mimeType, original_image_name: originalImage.name, edited_image_base64_url: watermarkedImage, prompt: fullPrompt }).select().single();
+          if (error) throw error;
+          if (data) {
+            const newHistoryItem: HistoryItem = { id: data.id, originalImage: { base64: data.original_image_base64, mimeType: data.original_image_mimetype, name: data.original_image_name }, editedImage: data.edited_image_base64_url, prompt: data.prompt, timestamp: new Date(data.created_at).toLocaleString() };
+            setCloudHistory(prev => [newHistoryItem, ...prev]);
+          }
         } else {
-          // Handle guest credits locally
-          const currentCredits = guestCredits;
-          const newCredits = currentCredits - cost;
-          setGuestCredits(newCredits);
+          const newHistoryItem: HistoryItem = { id: Date.now(), originalImage: originalImage, editedImage: watermarkedImage, prompt: fullPrompt, timestamp: new Date().toLocaleString() };
+          setLocalHistory(prev => [newHistoryItem, ...prev]);
         }
-      }
-
-      if (isProUser && user && supabase) {
-        const { data, error } = await supabase.from('creations').insert({ user_id: user.id, original_image_base64: originalImage.base64, original_image_mimetype: originalImage.mimeType, original_image_name: originalImage.name, edited_image_base64_url: watermarkedImage, prompt: fullPrompt }).select().single();
-        if (error) throw error;
-        if (data) {
-          const newHistoryItem: HistoryItem = { id: data.id, originalImage: { base64: data.original_image_base64, mimeType: data.original_image_mimetype, name: data.original_image_name }, editedImage: data.edited_image_base64_url, prompt: data.prompt, timestamp: new Date(data.created_at).toLocaleString() };
-          setCloudHistory(prev => [newHistoryItem, ...prev]);
-        }
-      } else {
-        const newHistoryItem: HistoryItem = { id: Date.now(), originalImage: originalImage, editedImage: watermarkedImage, prompt: fullPrompt, timestamp: new Date().toLocaleString() };
-        setLocalHistory(prev => [newHistoryItem, ...prev]);
+      } catch (backgroundError) {
+        console.error("Error during background task (credits/history):", backgroundError);
+        setError("Image generated, but failed to update credits or history. Please refresh to see accurate counts.");
       }
 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-    } finally {
-      setIsLoading(false);
+      // This catch handles errors from the primary task: image generation.
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during image generation.');
+      setIsLoading(false); // Ensure loading is turned off on failure.
     }
   };
 
@@ -621,7 +632,7 @@ const App: React.FC = () => {
         </Modal>
       )}
       <div style={{ position: 'fixed', bottom: '10px', right: '10px', backgroundColor: 'rgba(0, 255, 255, 0.2)', color: '#06b6d4', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', zIndex: 100, backdropFilter: 'blur(2px)' }}>
-        v1.29
+        v1.30
       </div>
     </div>
   );
