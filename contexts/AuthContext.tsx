@@ -32,7 +32,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, email, credits, is_pro') // Select only required fields
         .eq('id', userId)
         .single();
 
@@ -128,7 +128,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       .from('profiles')
       .update(updates)
       .eq('id', user.id)
-      .select()
+      .select('id, email, credits, is_pro')
       .single();
 
     if (error) throw error;

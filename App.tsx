@@ -176,7 +176,12 @@ const App: React.FC = () => {
     const fetchCloudHistory = async () => {
       if (!user || !supabase) return;
       try {
-        const { data, error } = await supabase.from('creations').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+        const { data, error } = await supabase
+          .from('creations')
+          .select('id, created_at, original_image_base64, original_image_mimetype, original_image_name, edited_image_base64_url, prompt')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
         if (error) throw error;
         if (data) {
           const mappedHistory: HistoryItem[] = data.map(item => ({ id: item.id, originalImage: { base64: item.original_image_base64, mimeType: item.original_image_mimetype, name: item.original_image_name }, editedImage: item.edited_image_base64_url, prompt: item.prompt, timestamp: new Date(item.created_at).toLocaleString() }));
