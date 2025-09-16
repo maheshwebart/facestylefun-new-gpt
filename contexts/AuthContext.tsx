@@ -51,7 +51,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const getInitialSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session?.user) {
+          setShowPurchaseModal(false);
+          setPaymentStatus('idle');
+          setShowAuthModal(true);
+          setError("Authentication error. Please sign in to add credits to your account.");
+          return;
+        }
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -164,4 +171,30 @@ export const useAuth = () => {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+};
+
+const handleSignIn = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
+  if (!email || !password) {
+    setError('Please enter your email and password.');
+    return;
+  }
+  const { error: authError } = await signInWithPassword(email, password);
+  if (authError) {
+    setError(authError.message);
+  }
+};
+
+const handleSignUp = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setError('');
+  if (password !== confirmPassword) {
+    setError('Passwords do not match.');
+    return;
+  }
+  const { error: authError } = await signUp(email, password);
+  if (authError) {
+    setError(authError.message);
+  }
 };
