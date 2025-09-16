@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { editImageWithGemini } from './services/geminiService';
 import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, HistoryItem, Gender } from './types';
@@ -326,15 +327,20 @@ const App: React.FC = () => {
       return;
     }
 
-    if (!user || !profile || !supabase) {
+    if (!supabase) {
+      setError("Could not connect to the database. Please try again later.");
+      setPaymentStatus('idle');
+      return;
+    }
+
+    // FIX: Re-fetch the session directly from Supabase to ensure it's not stale.
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.user) {
       setShowPurchaseModal(false);
       setPaymentStatus('idle');
-      if (!user) {
-        setShowAuthModal(true);
-        setError("Please sign in to add credits to your account.");
-      } else {
-        setError("Could not connect to the database. Please try again later.");
-      }
+      setShowAuthModal(true);
+      setError("Authentication error. Please sign in to add credits to your account.");
       return;
     }
 
@@ -365,21 +371,26 @@ const App: React.FC = () => {
       setError(null);
       setPurchaseReason(null);
     }, 2000);
-  }, [user, profile, refreshProfile, selectedTier]);
+  }, [refreshProfile, selectedTier]);
 
   const handleProSubscriptionSuccess = useCallback(async (details?: any) => {
     setPaymentStatus('processing');
     setError(null);
 
-    if (!user || !profile || !supabase) {
+    if (!supabase) {
+      setError("Could not connect to the database. Please try again later.");
+      setPaymentStatus('idle');
+      return;
+    }
+
+    // FIX: Re-fetch the session directly from Supabase to ensure it's not stale.
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError || !session?.user) {
       setShowPurchaseModal(false);
       setPaymentStatus('idle');
-      if (!user) {
-        setShowAuthModal(true);
-        setError("Please sign in to activate your Pro subscription.");
-      } else {
-        setError("Could not connect to the database. Please try again later.");
-      }
+      setShowAuthModal(true);
+      setError("Please sign in to activate your Pro subscription.");
       return;
     }
 
@@ -406,7 +417,7 @@ const App: React.FC = () => {
       setError(null);
       setPurchaseReason(null);
     }, 2000);
-  }, [user, profile, refreshProfile]);
+  }, [refreshProfile]);
 
   const handleOpenPurchaseModal = (tab: 'credits' | 'pro' = 'credits') => {
     setPurchaseReason(null); setPurchaseModalTab(tab); setShowPurchaseModal(true); setPaymentStatus('idle'); setSelectedTier(CREDIT_TIERS[1]); setError(null);
