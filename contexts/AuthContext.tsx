@@ -2,8 +2,8 @@
 
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
-// Fix: For older Supabase versions, types are imported from @supabase/gotrue-js.
-import type { AuthError, Session, User } from '@supabase/gotrue-js';
+// Fix: For Supabase v2, types are imported from the main package.
+import type { AuthError, Session, User } from '@supabase/supabase-js';
 import type { Profile } from '../types';
 
 interface AuthContextType {
@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .select('*')
         .eq('id', userId)
         .single();
-      
+
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         throw error;
       }
@@ -49,33 +49,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (!supabase) {
-        setLoading(false);
-        return;
+      setLoading(false);
+      return;
     }
 
     const getInitialSession = async () => {
-        try {
-            // Fix: Use supabase.auth.session() for v1 API. It's synchronous.
-            const session = supabase.auth.session();
-            setSession(session);
-            setUser(session?.user ?? null);
-            
-            if (session?.user) {
-                await fetchProfile(session.user.id);
-            }
-        } catch (err) {
-            console.error("Error fetching initial session:", err);
-            setSession(null);
-            setUser(null);
-            setProfile(null);
-        } finally {
-            setLoading(false);
+      try {
+        // Fix: Use supabase.auth.getSession() for v2 API. It's asynchronous.
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          await fetchProfile(session.user.id);
         }
+      } catch (err) {
+        console.error("Error fetching initial session:", err);
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
     getInitialSession();
 
-    // Fix: The method name is correct, but the error suggests a type issue. Assuming method exists.
+    // Fix: The method name is correct for v2.
     const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       const currentUser = session?.user ?? null;
@@ -92,14 +92,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => {
-      // Fix: Unsubscribe call for v1 API does not have `.subscription`.
-      authListener?.unsubscribe();
+      // Fix: Unsubscribe call for v2 API.
+      authListener?.subscription.unsubscribe();
     };
   }, [loading]); // Added loading to dependency array for the failsafe
-  
+
   const refreshProfile = useCallback(async () => {
     if (user) {
-        await fetchProfile(user.id);
+      await fetchProfile(user.id);
     }
   }, [user]);
 
@@ -113,54 +113,53 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signInWithPassword = useCallback(async (email: string) => {
     if (!supabase) return { error: null };
     setLoading(true);
-    // Fix: Use `signIn` for magic link in v1, not `signInWithOtp`.
-    const { error } = await supabase.auth.signIn({ email });
+    // Fix: Use `signInWithOtp` for magic link in v2.
+    const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) {
-        setError(error);
-        console.error('Sign in error:', error);
+      setError(error);
+      console.error('Sign in error:', error);
     }
     setLoading(false);
     return { error };
   }, []);
 
   const signUp = useCallback(async (email: string) => {
-    if (!supabase) return { user: null, error: null };
+    if (!supabase) return { data: null, error: null };
     setLoading(true);
-    // Fix: Use v1 `signUp` response destructuring.
-    const { user, error } = await supabase.auth.signUp({ 
+    // Fix: Use v2 `signUp` response destructuring.
+    const { data, error } = await supabase.auth.signUp({
       email,
-      password: Math.random().toString(36).slice(-8) 
+      password: Math.random().toString(36).slice(-8)
     });
     if (error) {
-        setError(error);
-        console.error('Sign up error:', error);
+      setError(error);
+      console.error('Sign up error:', error);
     }
     setLoading(false);
-    return { user, error };
+    return { user: data.user, error };
   }, []);
 
   const signOut = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
-    // Fix: The signOut method call is correct for v1. The error is likely due to typing issues resolved elsewhere.
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setLoading(false);
   }, []);
-  
+
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
-      if (!supabase || !user) return;
-      
-      const { data, error } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', user.id)
-          .select()
-          .single();
-          
-      if (error) throw error;
-      if (data) setProfile(data);
+    if (!supabase || !user) return;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (data) setProfile(data);
   }, [user]);
 
   const value = {
