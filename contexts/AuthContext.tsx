@@ -1,5 +1,6 @@
 
-import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
+
+import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
 import { supabase } from '../services/supabaseClient';
 import type { AuthError, Session, User } from '@supabase/supabase-js';
 import type { Profile } from '../types';
@@ -88,14 +89,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
   
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
         await fetchProfile(user.id);
     }
-  };
+  }, [user]);
 
-  const signInWithPassword = async (email: string) => {
-    if (!supabase) return;
+  const signInWithPassword = useCallback(async (email: string) => {
+    if (!supabase) return { error: null };
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) {
@@ -104,10 +105,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     setLoading(false);
     return { error };
-  };
+  }, []);
 
-  const signUp = async (email: string) => {
-    if (!supabase) return;
+  const signUp = useCallback(async (email: string) => {
+    if (!supabase) return { user: null, error: null };
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({ 
       email,
@@ -120,18 +121,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     setLoading(false);
     return { user: data.user, error };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setLoading(false);
-  };
+  }, []);
   
-  const updateProfile = async (updates: Partial<Profile>) => {
+  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
       if (!supabase || !user) return;
       
       const { data, error } = await supabase
@@ -143,7 +144,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           
       if (error) throw error;
       if (data) setProfile(data);
-  };
+  }, [user]);
 
   const value = {
     user,

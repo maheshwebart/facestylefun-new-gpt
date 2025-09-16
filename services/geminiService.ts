@@ -61,10 +61,24 @@ export const editImageWithGemini = async (
   } catch (error) {
     console.error("Gemini API error:", error);
     if (error instanceof Error) {
-        // Pass the original error message through, including a potential timeout message
-        throw new Error(error.message);
+        // Try to parse the message as JSON for more specific feedback from the API
+        try {
+            const errorJson = JSON.parse(error.message);
+            if (errorJson.error?.message) {
+                const message = errorJson.error.message;
+                // Provide a more user-friendly message for generic internal errors
+                if (errorJson.error.status === 'INTERNAL') {
+                    throw new Error('The AI service is currently unavailable. Please try again later.');
+                }
+                throw new Error(`AI Error: ${message}`);
+            }
+        } catch (parseError) {
+            // Not a JSON error, so just pass the original message through.
+            // This includes our own timeout messages.
+            throw new Error(error.message);
+        }
     }
-    // Generic fallback for unknown errors
+    // Generic fallback for any other type of error
     throw new Error("An unknown error occurred during image generation.");
   }
 };

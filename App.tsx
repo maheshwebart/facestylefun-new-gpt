@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { editImageWithGemini } from './services/geminiService';
 import type { ImageData, HairStyle, BeardStyle, SunglassesStyle, CorrectionStyle, HairStyleId, BeardStyleId, SunglassesStyleId, CorrectionStyleId, HistoryItem, Gender } from './types';
@@ -287,29 +288,39 @@ const App: React.FC = () => {
       setPurchaseReason(reason); setError(null); setPurchaseModalTab('credits'); setShowPurchaseModal(true); return;
     }
 
-    let fullPrompt = ''; 
-    const stylePrompts: string[] = [];
-    
-    if (selectedBeardId && effectiveGender === 'male') stylePrompts.push(BEARD_STYLES.find(s => s.id === selectedBeardId)?.prompt as string);
-    if (selectedSunglassesId) stylePrompts.push(SUNGLASSES_STYLES.find(s => s.id === selectedSunglassesId)?.prompt as string);
-    if (selectedCorrectionId) stylePrompts.push(CORRECTION_STYLES.find(s => s.id === selectedCorrectionId)?.prompt as string);
-    if (customPrompt.trim()) stylePrompts.push(customPrompt.trim());
-  
+    const prompts: string[] = [];
     const hairStyles = effectiveGender === 'male' ? MALE_HAIR_STYLES : FEMALE_HAIR_STYLES;
     
+    // Core instruction for hair is always present if any selection is made
     if (referenceImage) {
-      const mainPrompt = `Use the hairstyle from the second image on the ${effectiveGender} person in the first image. Correct hair loss.`;
-      fullPrompt = stylePrompts.length > 0 ? `${mainPrompt} Also, add ${stylePrompts.join(', ')}.` : mainPrompt;
+        prompts.push('Apply the hairstyle from the reference image to the person in the main image. Correct any hair loss.');
+    } else if (selectedHairId) {
+        const style = hairStyles.find(s => s.id === selectedHairId);
+        if (style) prompts.push(`For the ${effectiveGender} person, apply this hairstyle: ${style.prompt}. Correct any hair loss.`);
     } else {
-      if (selectedHairId) {
-        stylePrompts.unshift(`a new hairstyle: ${hairStyles.find(s => s.id === selectedHairId)?.prompt}`);
-      } else if (stylePrompts.length === 0) {
-        stylePrompts.push('subtly enhance existing hairstyle and correct hair loss.');
-      }
-      fullPrompt = `To the ${effectiveGender} in the image, apply these changes: ${stylePrompts.join(', ')}.`;
+        prompts.push('Subtly enhance the existing hairstyle of the person in the image. Correct any hair loss.');
     }
 
-    fullPrompt += ' Make the result realistic.';
+    // Add other styles
+    if (selectedBeardId && effectiveGender === 'male') {
+        const style = BEARD_STYLES.find(s => s.id === selectedBeardId);
+        if (style) prompts.push(`Add beard: ${style.prompt}.`);
+    }
+    if (selectedSunglassesId) {
+        const style = SUNGLASSES_STYLES.find(s => s.id === selectedSunglassesId);
+        if (style) prompts.push(`Add sunglasses: ${style.prompt}.`);
+    }
+    if (selectedCorrectionId) {
+        const style = CORRECTION_STYLES.find(s => s.id === selectedCorrectionId);
+        if (style) prompts.push(style.prompt);
+    }
+    if (customPrompt.trim()) {
+        prompts.push(customPrompt.trim());
+    }
+
+    prompts.push('The final result must be photorealistic and blend seamlessly with the original image.');
+    const fullPrompt = prompts.join(' ');
+    
     await executeImageEdit(cost, fullPrompt);
   };
   
@@ -353,7 +364,8 @@ const App: React.FC = () => {
           setTimeout(() => reject(new Error("Server response timed out. Please contact support if your credits don't appear shortly.")), 20000)
         );
 
-        const { error: rpcError } = await Promise.race([operationPromise, timeoutPromise]);
+        // Fix: Explicitly type the result of Promise.race to prevent incorrect type inference.
+        const { error: rpcError } = await Promise.race<any>([operationPromise, timeoutPromise]);
         
         if (rpcError) {
             console.error('RPC Error adding credits:', rpcError);
@@ -405,7 +417,8 @@ const App: React.FC = () => {
           setTimeout(() => reject(new Error("Server response timed out. Please contact support if your subscription isn't active shortly.")), 20000)
         );
 
-        const { error: rpcError } = await Promise.race([operationPromise, timeoutPromise]);
+        // Fix: Explicitly type the result of Promise.race to prevent incorrect type inference.
+        const { error: rpcError } = await Promise.race<any>([operationPromise, timeoutPromise]);
         
         if (rpcError) {
             console.error('RPC Error activating pro:', rpcError);
