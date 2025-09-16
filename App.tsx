@@ -243,11 +243,19 @@ const App: React.FC = () => {
       setIsLoading(false);
 
       // Step 3: Perform credit deduction and history saving as background tasks.
-      // This is wrapped in its own try/catch to prevent its failure from affecting the user experience.
       try {
         if (!isProUser) {
           if (user && supabase) {
-            await supabase.rpc('add_credits', { credits_to_add: -cost });
+            // FIX: Properly handle the response from the RPC call.
+            const { error: rpcError } = await supabase.rpc('add_credits', { credits_to_add: -cost });
+
+            // If the RPC call returns an error, throw it to be caught by the outer block.
+            if (rpcError) {
+              console.error("RPC error deducting credits:", rpcError);
+              throw new Error("Failed to deduct credits from your account.");
+            }
+
+            // Only refresh the profile if the credit deduction was successful.
             await refreshProfile();
           } else {
             setGuestCredits(prevCredits => prevCredits - cost);
@@ -632,7 +640,7 @@ const App: React.FC = () => {
         </Modal>
       )}
       <div style={{ position: 'fixed', bottom: '10px', right: '10px', backgroundColor: 'rgba(0, 255, 255, 0.2)', color: '#06b6d4', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', zIndex: 100, backdropFilter: 'blur(2px)' }}>
-        v1.30
+        v1.31
       </div>
     </div>
   );
