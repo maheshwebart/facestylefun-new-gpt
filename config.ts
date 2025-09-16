@@ -2,11 +2,8 @@
 // will replace `import.meta.env.VARIABLE_NAME` with the actual value at build time.
 
 // --- PayPal Configuration ---
-// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
 const PAYPAL_ENV = (import.meta as any).env.VITE_PAYPAL_ENV || 'sandbox';
-// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
 const PAYPAL_CLIENT_ID_LIVE = (import.meta as any).env.VITE_PAYPAL_CLIENT_ID_LIVE;
-// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
 const PAYPAL_CLIENT_ID_SANDBOX = (import.meta as any).env.VITE_PAYPAL_CLIENT_ID_SANDBOX;
 
 export const PAYPAL_CLIENT_ID = PAYPAL_ENV === 'live' 
@@ -22,7 +19,6 @@ if (!PAYPAL_CLIENT_ID) {
 }
 
 // --- Razorpay Configuration ---
-// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
 export const RAZORPAY_KEY_ID = (import.meta as any).env.VITE_RAZORPAY_KEY_ID;
 
 if (!RAZORPAY_KEY_ID) {
@@ -33,9 +29,7 @@ if (!RAZORPAY_KEY_ID) {
 }
 
 // --- Supabase Configuration ---
-// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
 export const SUPABASE_URL = (import.meta as any).env.VITE_SUPABASE_URL;
-// Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
 export const SUPABASE_ANON_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
 
 export const isSupabaseconfigured = SUPABASE_URL && SUPABASE_ANON_KEY;

@@ -35,7 +35,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .select('id, email, credits, is_pro') // Select only required fields
         .eq('id', userId)
         .single();
-
+      
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         throw error;
       }
@@ -47,17 +47,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (!supabase) {
-      setLoading(false);
-      return;
+        setLoading(false);
+        return;
     }
 
     setLoading(true);
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
-
+      
       if (currentUser) {
         await fetchProfile(currentUser.id);
       } else {
@@ -67,14 +66,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
 
     return () => {
-      authListener?.subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
-  }, []); // Empty dependency array ensures this effect runs only once on mount
+  }, []);
 
-
+  
   const refreshProfile = useCallback(async () => {
     if (user) {
-      await fetchProfile(user.id);
+        await fetchProfile(user.id);
     }
   }, [user]);
 
@@ -90,8 +89,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setLoading(true);
     const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) {
-      setError(error);
-      console.error('Sign in error:', error);
+        setError(error);
+        console.error('Sign in error:', error);
     }
     setLoading(false);
     return { error };
@@ -100,13 +99,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signUp = useCallback(async (email: string) => {
     if (!supabase) return { data: null, error: null };
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({ 
       email,
-      password: Math.random().toString(36).slice(-8)
+      password: Math.random().toString(36).slice(-8) 
     });
     if (error) {
-      setError(error);
-      console.error('Sign up error:', error);
+        setError(error);
+        console.error('Sign up error:', error);
     }
     setLoading(false);
     return { user: data.user, error };
@@ -120,19 +119,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setProfile(null);
     setLoading(false);
   }, []);
-
+  
   const updateProfile = useCallback(async (updates: Partial<Profile>) => {
-    if (!supabase || !user) return;
-
-    const { data, error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', user.id)
-      .select('id, email, credits, is_pro')
-      .single();
-
-    if (error) throw error;
-    if (data) setProfile(data);
+      if (!supabase || !user) return;
+      
+      const { data, error } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id)
+          .select('id, email, credits, is_pro')
+          .single();
+          
+      if (error) throw error;
+      if (data) setProfile(data);
   }, [user]);
 
   const value = {

@@ -27,8 +27,7 @@ const CouponRedeemer: React.FC = () => {
         );
 
         // Race the RPC call against the timeout
-        // Fix: Cast the result of Promise.race to satisfy TypeScript's type inference.
-        const result: { data: any; error: any; } = await Promise.race<any>([rpcPromise, timeoutPromise]);
+        const result = await Promise.race<any>([rpcPromise, timeoutPromise]);
         
         const { data, error } = result;
 

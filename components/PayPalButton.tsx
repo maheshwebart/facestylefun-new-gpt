@@ -1,7 +1,5 @@
 
 import React from 'react';
-// Fix: OnApproveData and CreateOrderData are not exported from '@paypal/react-paypal-js'.
-// They have been removed from the import statement.
 import { PayPalButtons } from '@paypal/react-paypal-js';
 
 interface PayPalButtonProps {
@@ -14,7 +12,6 @@ interface PayPalButtonProps {
 
 const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSuccess, onError, disabled }) => {
 
-  // Fix: Replaced the non-exported type `CreateOrderData` with `Record<string, unknown>`.
   const createOrder = (data: Record<string, unknown>, actions: any) => {
     try {
       return actions.order.create({
@@ -36,7 +33,6 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
     }
   };
 
-  // Fix: Replaced the non-exported type `OnApproveData` with `any`.
   const onApprove = async (data: any, actions: any) => {
     try {
       const details = await actions.order.capture();

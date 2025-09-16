@@ -1,5 +1,4 @@
 import React from 'react';
-// Fix: Use @supabase/supabase-js for User type as it's exported from the root in v2.
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 export type User = SupabaseUser;
@@ -29,7 +28,7 @@ export interface Style<T extends string> {
 export type Gender = 'male' | 'female';
 
 // Hair Styles
-export type HairStyleId =
+export type HairStyleId = 
   'short-and-neat' | 'modern-fade' | 'long-and-wavy' | 'curly-top' | 'bald-fade' | 'afro' | 'slicked-back' |
   'bob-cut' | 'ponytail' | 'long-straight' | 'pixie-cut' | 'shag-cut' | 'braids' | 'updo';
 export type HairStyle = Style<HairStyleId>;
