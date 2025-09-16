@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { supabase } from '../services/supabaseClient';
 import type { AuthError, Session, User } from '@supabase/supabase-js';
@@ -9,8 +10,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   error: AuthError | null;
-  signInWithPassword: (email: string, password: string) => Promise<any>;
-  signUp: (email: string, password: string) => Promise<any>;
+  signInWithPassword: (email: string) => Promise<any>;
+  signUp: (email: string) => Promise<any>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -33,7 +34,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         .select('*')
         .eq('id', userId)
         .single();
-
+      
       if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
         throw error;
       }
@@ -45,34 +46,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     if (!supabase) {
-      setLoading(false);
-      return;
+        setLoading(false);
+        return;
     }
 
     const getInitialSession = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session?.user) {
-          setShowPurchaseModal(false);
-          setPaymentStatus('idle');
-          setShowAuthModal(true);
-          setError("Authentication error. Please sign in to add credits to your account.");
-          return;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            setSession(session);
+            setUser(session?.user ?? null);
+            
+            if (session?.user) {
+                await fetchProfile(session.user.id);
+            }
+        } catch (err) {
+            console.error("Error fetching initial session:", err);
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+        } finally {
+            setLoading(false);
         }
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-        }
-      } catch (err) {
-        console.error("Error fetching initial session:", err);
-        setSession(null);
-        setUser(null);
-        setProfile(null);
-      } finally {
-        setLoading(false);
-      }
     };
 
     getInitialSession();
@@ -93,35 +87,39 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       authListener?.subscription.unsubscribe();
     };
   }, []);
-
+  
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+        await fetchProfile(user.id);
     }
   };
 
-  const signInWithPassword = async (email: string, password: string) => {
+  const signInWithPassword = async (email: string) => {
     if (!supabase) return;
     setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) {
-      setError(error);
-      console.error('Sign in error:', error);
+        setError(error);
+        console.error('Sign in error:', error);
     }
     setLoading(false);
-    return { user: data?.user, error };
+    return { error };
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string) => {
     if (!supabase) return;
     setLoading(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ 
+      email,
+      // A password is required but Supabase magic link makes it so user doesn't need to create one initially
+      password: Math.random().toString(36).slice(-8) 
+    });
     if (error) {
-      setError(error);
-      console.error('Sign up error:', error);
+        setError(error);
+        console.error('Sign up error:', error);
     }
     setLoading(false);
-    return { user: data?.user, error };
+    return { user: data.user, error };
   };
 
   const signOut = async () => {
@@ -130,23 +128,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
-    setSession(null);
     setLoading(false);
   };
-
+  
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!supabase || !user) return;
-    try {
+      if (!supabase || !user) return;
+      
       const { data, error } = await supabase
-        .from('profiles')
-        .upsert({ id: user.id, ...updates });
-
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id)
+          .select()
+          .single();
+          
       if (error) throw error;
-
-      setProfile((prev) => ({ ...prev, ...updates } as Profile));
-    } catch (error) {
-      console.error('Error updating profile:', error);
-    }
+      if (data) setProfile(data);
   };
 
   const value = {
@@ -165,36 +161,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-export const useAuth = () => {
+export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-};
-
-const handleSignIn = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
-  if (!email || !password) {
-    setError('Please enter your email and password.');
-    return;
-  }
-  const { error: authError } = await signInWithPassword(email, password);
-  if (authError) {
-    setError(authError.message);
-  }
-};
-
-const handleSignUp = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setError('');
-  if (password !== confirmPassword) {
-    setError('Passwords do not match.');
-    return;
-  }
-  const { error: authError } = await signUp(email, password);
-  if (authError) {
-    setError(authError.message);
-  }
 };

@@ -18,41 +18,41 @@ const CouponRedeemer: React.FC = () => {
     setMessage(null);
 
     try {
-      const rpcPromise = supabase.rpc('redeem_coupon', {
-        coupon_code: couponCode.trim(),
-      });
+        const rpcPromise = supabase.rpc('redeem_coupon', {
+            coupon_code: couponCode.trim(),
+        });
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Request timed out. Please try again later.')), 15000)
-      );
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out. Please try again later.')), 15000)
+        );
 
-      // Race the RPC call against the timeout
-      const result: { data: any; error: any; } = await Promise.race([rpcPromise, timeoutPromise]);
+        // Race the RPC call against the timeout
+        const result: { data: any; error: any; } = await Promise.race([rpcPromise, timeoutPromise]);
+        
+        const { data, error } = result;
 
-      const { data, error } = result;
-
-      if (error) {
-        setMessage({ type: 'error', text: 'An unexpected error occurred. Please try again.' });
-        console.error('RPC Error:', error);
-      } else if (data) {
-        const responseText = data as string;
-        if (responseText.startsWith('Success')) {
-          setMessage({ type: 'success', text: responseText });
-          await refreshProfile(); // Refresh user profile to show new credits
-          setCouponCode('');
-        } else {
-          setMessage({ type: 'error', text: responseText.replace('Error: ', '') });
+        if (error) {
+            setMessage({ type: 'error', text: 'An unexpected error occurred. Please try again.' });
+            console.error('RPC Error:', error);
+        } else if (data) {
+            const responseText = data as string;
+            if (responseText.startsWith('Success')) {
+                setMessage({ type: 'success', text: responseText });
+                await refreshProfile(); // Refresh user profile to show new credits
+                setCouponCode('');
+            } else {
+                setMessage({ type: 'error', text: responseText.replace('Error: ', '') });
+            }
         }
-      }
     } catch (err) {
-      if (err instanceof Error) {
-        setMessage({ type: 'error', text: `Error: ${err.message}` });
-      } else {
-        setMessage({ type: 'error', text: 'An unknown error occurred.' });
-      }
-      console.error('Coupon redemption error:', err);
+        if (err instanceof Error) {
+            setMessage({ type: 'error', text: `Error: ${err.message}` });
+        } else {
+            setMessage({ type: 'error', text: 'An unknown error occurred.' });
+        }
+        console.error('Coupon redemption error:', err);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 

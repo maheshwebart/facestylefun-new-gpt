@@ -3,7 +3,6 @@ import React from 'react';
 // Fix: OnApproveData and CreateOrderData are not exported from '@paypal/react-paypal-js'.
 // They have been removed from the import statement.
 import { PayPalButtons } from '@paypal/react-paypal-js';
-import { useAuth } from '../contexts/AuthContext';
 
 interface PayPalButtonProps {
   amount: string;
@@ -11,19 +10,9 @@ interface PayPalButtonProps {
   onSuccess: (details: any) => void;
   onError: (error: string) => void;
   disabled: boolean;
-  onAuthRequest?: () => void;
 }
 
-const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSuccess, onError, disabled, onAuthRequest }) => {
-  const { user } = useAuth();
-
-  const handleClick = (data: Record<string, unknown>, actions: any) => {
-    if (!user) {
-      onAuthRequest?.();
-      return actions.reject();
-    }
-    return actions.resolve();
-  };
+const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSuccess, onError, disabled }) => {
 
   // Fix: Replaced the non-exported type `CreateOrderData` with `Record<string, unknown>`.
   const createOrder = (data: Record<string, unknown>, actions: any) => {
@@ -66,14 +55,13 @@ const PayPalButton: React.FC<PayPalButtonProps> = ({ amount, description, onSucc
 
   return (
     <div className={`transition-opacity duration-300 ${disabled ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-      <PayPalButtons
-        style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
-        onClick={onAuthRequest ? handleClick : undefined}
-        createOrder={createOrder}
-        onApprove={onApprove}
-        onError={catchError}
-        forceReRender={[amount, description]} // Re-render the button if the amount or description changes
-      />
+        <PayPalButtons
+            style={{ layout: "vertical", color: "blue", shape: "rect", label: "pay" }}
+            createOrder={createOrder}
+            onApprove={onApprove}
+            onError={catchError}
+            forceReRender={[amount, description]} // Re-render the button if the amount or description changes
+        />
     </div>
   );
 };

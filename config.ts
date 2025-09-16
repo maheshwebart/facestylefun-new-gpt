@@ -9,9 +9,9 @@ const PAYPAL_CLIENT_ID_LIVE = (import.meta as any).env.VITE_PAYPAL_CLIENT_ID_LIV
 // Fix: Cast import.meta to any to resolve TypeScript error about 'env' property.
 const PAYPAL_CLIENT_ID_SANDBOX = (import.meta as any).env.VITE_PAYPAL_CLIENT_ID_SANDBOX;
 
-export const PAYPAL_CLIENT_ID = PAYPAL_ENV === 'live'
-  ? PAYPAL_CLIENT_ID_LIVE
-  : PAYPAL_CLIENT_ID_SANDBOX;
+export const PAYPAL_CLIENT_ID = PAYPAL_ENV === 'live' 
+    ? PAYPAL_CLIENT_ID_LIVE 
+    : PAYPAL_CLIENT_ID_SANDBOX;
 
 if (!PAYPAL_CLIENT_ID) {
   console.warn(
@@ -41,9 +41,9 @@ export const SUPABASE_ANON_KEY = (import.meta as any).env.VITE_SUPABASE_ANON_KEY
 export const isSupabaseconfigured = SUPABASE_URL && SUPABASE_ANON_KEY;
 
 if (!isSupabaseconfigured) {
-  console.warn(
-    "Supabase is not configured. " +
-    "Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY " +
-    "in your Netlify environment variables to enable user accounts and persistent data."
-  );
+    console.warn(
+        "Supabase is not configured. " +
+        "Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY " +
+        "in your Netlify environment variables to enable user accounts and persistent data."
+    );
 }
