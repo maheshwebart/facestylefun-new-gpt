@@ -277,49 +277,55 @@ const App: React.FC = () => {
   const effectiveGender = gender;
 
   const handleApplyChanges = async () => {
-    if (isLoading || !hasSelection) { if (!hasSelection) setError("Please select at least one style to apply."); return; }
-    
+    if (isLoading || !hasSelection) {
+      if (!hasSelection) setError("Please select at least one style to apply.");
+      return;
+    }
+
     const cost = isProUser ? 0 : featureCount;
     const currentCredits = profile?.credits ?? guestCredits;
 
     if (currentCredits < cost) {
       let reason = `You need ${cost} credit${cost > 1 ? 's' : ''} for this edit, but you only have ${currentCredits}. Please top up.`;
       if (!user) reason = `Your free guest credits are not enough for this ${cost}-credit edit. Please sign in or buy a credit pack.`
-      setPurchaseReason(reason); setError(null); setPurchaseModalTab('credits'); setShowPurchaseModal(true); return;
+      setPurchaseReason(reason);
+      setError(null);
+      setPurchaseModalTab('credits');
+      setShowPurchaseModal(true);
+      return;
     }
 
-    const prompts: string[] = [];
+    // REVERTED to a simpler, more direct prompt structure for speed and reliability.
+    const promptParts: string[] = [];
     const hairStyles = effectiveGender === 'male' ? MALE_HAIR_STYLES : FEMALE_HAIR_STYLES;
     
-    // Core instruction for hair is always present if any selection is made
     if (referenceImage) {
-        prompts.push('Apply the hairstyle from the reference image to the person in the main image. Correct any hair loss.');
+        promptParts.push(`Apply the hairstyle from the reference image. Correct any visible hair loss.`);
     } else if (selectedHairId) {
         const style = hairStyles.find(s => s.id === selectedHairId);
-        if (style) prompts.push(`For the ${effectiveGender} person, apply this hairstyle: ${style.prompt}. Correct any hair loss.`);
-    } else {
-        prompts.push('Subtly enhance the existing hairstyle of the person in the image. Correct any hair loss.');
+        if (style) promptParts.push(`Apply hairstyle: ${style.prompt}. Correct any visible hair loss.`);
     }
-
-    // Add other styles
+    
     if (selectedBeardId && effectiveGender === 'male') {
         const style = BEARD_STYLES.find(s => s.id === selectedBeardId);
-        if (style) prompts.push(`Add beard: ${style.prompt}.`);
-    }
-    if (selectedSunglassesId) {
-        const style = SUNGLASSES_STYLES.find(s => s.id === selectedSunglassesId);
-        if (style) prompts.push(`Add sunglasses: ${style.prompt}.`);
-    }
-    if (selectedCorrectionId) {
-        const style = CORRECTION_STYLES.find(s => s.id === selectedCorrectionId);
-        if (style) prompts.push(style.prompt);
-    }
-    if (customPrompt.trim()) {
-        prompts.push(customPrompt.trim());
+        if (style) promptParts.push(`Add beard: ${style.prompt}.`);
     }
 
-    prompts.push('The final result must be photorealistic and blend seamlessly with the original image.');
-    const fullPrompt = prompts.join(' ');
+    if (selectedSunglassesId) {
+        const style = SUNGLASSES_STYLES.find(s => s.id === selectedSunglassesId);
+        if (style) promptParts.push(`Add sunglasses: ${style.prompt}.`);
+    }
+
+    if (selectedCorrectionId) {
+        const style = CORRECTION_STYLES.find(s => s.id === selectedCorrectionId);
+        if (style) promptParts.push(`Correction: ${style.prompt}.`);
+    }
+
+    if (customPrompt.trim()) {
+        promptParts.push(`Custom adjustment: "${customPrompt.trim()}".`);
+    }
+    
+    const fullPrompt = `For the person in the main image, apply these changes: ${promptParts.join(' ')} The final result must be photorealistic and blend seamlessly.`;
     
     await executeImageEdit(cost, fullPrompt);
   };
@@ -605,6 +611,9 @@ const App: React.FC = () => {
             </PayPalScriptProvider>
         </Modal>
       )}
+      <div style={{ position: 'fixed', bottom: '10px', right: '10px', backgroundColor: 'rgba(0, 255, 255, 0.2)', color: '#06b6d4', padding: '2px 8px', borderRadius: '4px', fontSize: '10px', zIndex: 100, backdropFilter: 'blur(2px)' }}>
+        v1.28
+      </div>
     </div>
   );
 };
